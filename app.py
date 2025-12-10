@@ -2,6 +2,7 @@ import streamlit as st
 import os
 import shutil
 import gc
+import time
 from ingest import load_documents, split_documents, add_to_chroma, clear_database
 from chain import ask_question
 from config import DATA_PATH, AVAILABLE_LLMS
@@ -78,6 +79,7 @@ with st.sidebar:
               st.cache_resource.clear()
               st.success(f"Successfully processed {len(uploaded_files)} documents!")
               st.session_state.uploader_key += 1
+              time.sleep(3)
               st.rerun() 
           else:
               st.warning("Select the file before processing.")
