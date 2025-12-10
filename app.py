@@ -51,6 +51,12 @@ with st.sidebar:
           
           # Save uploaded files to the data folder
           if uploaded_files:
+              for old_file in os.listdir(DATA_PATH):
+                old_file_path = os.path.join(DATA_PATH, old_file)
+                try:
+                    os.remove(old_file_path)
+                except:
+                    pass
               for uploaded_file in uploaded_files:
                   save_path = os.path.join(DATA_PATH, uploaded_file.name)
                   with open(save_path, "wb") as f:
