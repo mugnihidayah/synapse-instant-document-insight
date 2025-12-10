@@ -56,6 +56,7 @@ with st.sidebar:
                   with open(save_path, "wb") as f:
                       f.write(uploaded_file.getbuffer())
               
+              clear_database()
               # Run the ingest process
               docs = load_documents()
               chunks = split_documents(docs)
