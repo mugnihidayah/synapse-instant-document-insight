@@ -40,7 +40,8 @@ with st.sidebar:
   uploaded_files = st.file_uploader(
       "Upload PDF/TXT/DOCX", 
       accept_multiple_files=True,
-      type=["pdf", "txt", "docx"]
+      type=["pdf", "txt", "docx"],
+      key=f"uploader_{st.session_state.uploader_key}"
   )
   
   if st.button("Document Process (Ingest)"):
@@ -69,6 +70,7 @@ with st.sidebar:
               add_to_chroma(chunks)
               st.cache_resource.clear()
               st.success(f"Successfully processed {len(uploaded_files)} documents!")
+              st.session_state.uploader_key += 1
               st.rerun() 
           else:
               st.warning("Select the file before processing.")
@@ -110,6 +112,10 @@ with st.sidebar:
 # SESSION STATE (Chat History)
 if "messages" not in st.session_state:
     st.session_state.messages = []
+
+if "uploader_key" not in st.session_state:
+    st.session_state.uploader_key = 0
+
 # RENDER CHAT HISTORY (Supaya chat lama tetap ada)
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
