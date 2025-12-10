@@ -60,7 +60,9 @@ with st.sidebar:
               docs = load_documents()
               chunks = split_documents(docs)
               add_to_chroma(chunks)
+              st.cache_resource.clear()
               st.success(f"Successfully processed {len(uploaded_files)} documents!")
+              st.rerun() 
           else:
               st.warning("Select the file before processing.")
 
