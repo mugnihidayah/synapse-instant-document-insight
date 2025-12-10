@@ -6,6 +6,13 @@ from ingest import load_documents, split_documents, add_to_chroma, clear_databas
 from chain import ask_question
 from config import DATA_PATH, AVAILABLE_LLMS
 
+# SESSION STATE (Chat History)
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+if "uploader_key" not in st.session_state:
+    st.session_state.uploader_key = 0
+
 # PAGE CONFIGURATION
 st.set_page_config(
   page_title="Synapse",
@@ -108,13 +115,6 @@ with st.sidebar:
   lang_code = "id" if language == "Indonesia" else "en"
 
   st.divider()
-
-# SESSION STATE (Chat History)
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-if "uploader_key" not in st.session_state:
-    st.session_state.uploader_key = 0
 
 # RENDER CHAT HISTORY (Supaya chat lama tetap ada)
 for message in st.session_state.messages:
