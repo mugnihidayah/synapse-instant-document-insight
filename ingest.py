@@ -7,8 +7,10 @@ from langchain_community.document_loaders import (
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
-from config import DATA_PATH, EMBEDDING_MODEL
+from config import DATA_PATH, EMBEDDING_MODEL, HUGGINGFACE_TOKEN
 
+if HUGGINGFACE_TOKEN:
+    login(token=HUGGINGFACE_TOKEN)
 
 # SETUP MODEL EMBEDDING
 def get_embedding_function():

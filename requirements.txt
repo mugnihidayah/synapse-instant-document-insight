@@ -14,3 +14,4 @@ docx2txt
 tiktoken
 pymupdf
 chromadb
+huggingface_hub

@@ -9,6 +9,7 @@ CACHE_DIR = "./opt"
 
 # API KEY
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
 
 # MODEL CONFIGURATION
 EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
