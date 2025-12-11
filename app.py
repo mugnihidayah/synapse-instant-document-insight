@@ -3,16 +3,19 @@ import os
 import shutil
 import gc
 import time
-from ingest import load_documents, split_documents, add_to_chroma, clear_database
+from ingest import load_documents, split_documents, create_vectorstore
 from chain import ask_question
 from config import DATA_PATH, AVAILABLE_LLMS
 
-# SESSION STATE (Chat History)
+# SESSION STATE
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 if "uploader_key" not in st.session_state:
     st.session_state.uploader_key = 0
+
+if "vectorstore" not in st.session_state:
+    st.session_state.vectorstore = None
 
 # PAGE CONFIGURATION
 st.set_page_config(
@@ -71,11 +74,10 @@ with st.sidebar:
                   with open(save_path, "wb") as f:
                       f.write(uploaded_file.getbuffer())
               
-              clear_database()
               # Run the ingest process
               docs = load_documents()
               chunks = split_documents(docs)
-              add_to_chroma(chunks)
+              st.session_state.vectorstore = create_vectorstore(chunks)
               st.cache_resource.clear()
               st.success(f"Successfully processed {len(uploaded_files)} documents!")
               st.session_state.uploader_key += 1
@@ -87,25 +89,18 @@ with st.sidebar:
   # Reset Database
   st.divider()
   if st.button("🗑️ Reset Database", type="secondary"):
-      st.cache_resource.clear()
-      gc.collect()
-      
-      with st.spinner("Deleting data..."):
-          if clear_database():
-              # Delete physical files in the data folder
-              if os.path.exists(DATA_PATH):
-                  for filename in os.listdir(DATA_PATH):
-                      file_path = os.path.join(DATA_PATH, filename)
-                      try:
-                          os.remove(file_path)
-                      except Exception as e:
-                          print(f"Failed to delete {filename}: {e}")
-              
-              st.success("Database & uploaded files have been cleared!")
-              st.session_state.messages = []
-              st.rerun()
-          else:
-              st.error("Failed to delete database. Try restarting the application.")
+    st.session_state.vectorstore = None
+    st.session_state.messages = []
+    # Delete physical files in the data folder
+    if os.path.exists(DATA_PATH):
+        for filename in os.listdir(DATA_PATH):
+            try:
+                os.remove(os.path.join(DATA_PATH, filename))
+            except:
+                pass
+    st.success("Database & uploaded files have been cleared!")
+    time.sleep(3)
+    st.rerun()
 
   # Language Selector
   language = st.selectbox(
@@ -134,7 +129,8 @@ if prompt := st.chat_input("Ask a question about this document..."):
             # Call our RAG function
             stream_generator, sources = ask_question(
                 prompt, 
-                st.session_state.messages, 
+                st.session_state.messages,
+                st.session_state.vectorstore,
                 model_name=selected_model, 
                 temperature=temperature,
                 language=lang_code,

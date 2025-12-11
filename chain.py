@@ -1,20 +1,9 @@
-import os
 import streamlit as st
 from langchain_groq import ChatGroq
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langchain_chroma import Chroma
-from langchain_huggingface import HuggingFaceEmbeddings
 from flashrank import Ranker, RerankRequest
-from config import *
-
-@st.cache_resource
-def get_vectorstore():
-    # Setup Embedding
-    embedding_function = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
-    # Setup Vector DB
-    db = Chroma(persist_directory=DB_PATH, embedding_function=embedding_function)
-    return db
+from config import GROQ_API_KEY, LLM_MODEL, RERANKER_MODEL, CACHE_DIR
 
 @st.cache_resource
 def get_reranker():
@@ -68,7 +57,6 @@ Jawaban Detail:
 """
 
 def format_history(messages):
-    """Converting Streamlit message format to plain text format for prompts"""
     formatted = ""
     for msg in messages:
         role = "User" if msg["role"] == "user" else "Assistant"
@@ -76,29 +64,30 @@ def format_history(messages):
     return formatted
 
 def format_docs(docs):
-  return "\n\n".join([d.page_content for d in docs])
+    return "\n\n".join([d.page_content for d in docs])
 
 # CORE LOGIC
-def ask_question(question, messages, model_name=LLM_MODEL, temperature=0.0, language="id"): # <--- Tambah language
-    """
-    Primary RAG Function with Streaming, Memory, and Multilingual support.
-    """
-    vectorstore = get_vectorstore()
+def ask_question(question, messages, vectorstore, model_name=LLM_MODEL, temperature=0.0, language="id"):
+    """RAG Function with vectorstore as parameter (per-session)"""
+    
+    if vectorstore is None:
+        return ["Please upload and process a document first."], []
+    
     reranker = get_reranker()
     
-    # Dynamic LLM Setup (According to User's Choice)
     llm = ChatGroq(
         model_name=model_name,
         temperature=temperature,
         api_key=GROQ_API_KEY,
         streaming=True
     )
+    
     retriever = vectorstore.as_retriever(search_kwargs={"k": 10})
     initial_docs = retriever.invoke(question)
     
     if not initial_docs:
-        return ["Sorry, the document was not found or the database is empty."], []
-    # Reranking (Passages construction)
+        return ["Sorry, no relevant information found in your document."], []
+    
     passages = [
         {"id": str(i), "text": doc.page_content, "meta": doc.metadata}
         for i, doc in enumerate(initial_docs)
@@ -106,13 +95,12 @@ def ask_question(question, messages, model_name=LLM_MODEL, temperature=0.0, lang
     rerank_request = RerankRequest(query=question, passages=passages)
     reranked_result = reranker.rerank(rerank_request)
     top_results = reranked_result[:3]
-
-    # Context & History
+    
     context_text = "\n\n".join([res['text'] for res in top_results])
     history_text = format_history(messages[:-1])
     sources = [res['meta'] for res in top_results]
-    template = PROMPT_ID if language == "id" else PROMPT_EN
     
+    template = PROMPT_ID if language == "id" else PROMPT_EN
     prompt = PromptTemplate.from_template(template)
     chain = prompt | llm | StrOutputParser()
     

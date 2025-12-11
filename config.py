@@ -5,7 +5,6 @@ load_dotenv()
 
 # Directory
 DATA_PATH = "./data"
-DB_PATH = "./vectorstore"
 CACHE_DIR = "./opt"
 
 # API KEY
