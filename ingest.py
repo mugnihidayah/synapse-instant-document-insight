@@ -20,23 +20,33 @@ def get_embedding_function():
 
 
 # LOAD DOCUMENT
-def load_documents():
-    if not os.path.exists(DATA_PATH):
-        os.makedirs(DATA_PATH)
-        return []
+import tempfile
+
+def load_documents_from_files(uploaded_files):
+    """Load documents directly from uploaded file objects (in-memory)"""
     loaders = {
         ".pdf": PyMuPDFLoader,
         ".txt": TextLoader,
         ".docx": Docx2txtLoader,
     }
+    
     documents = []
-    for filename in os.listdir(DATA_PATH):
-        ext = os.path.splitext(filename)[1]
+    for uploaded_file in uploaded_files:
+        ext = os.path.splitext(uploaded_file.name)[1].lower()
         if ext in loaders:
+            # Save to temp file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+                tmp.write(uploaded_file.getbuffer())
+                tmp_path = tmp.name
+            
+            # Load from temp file
             loader_class = loaders[ext]
-            file_path = os.path.join(DATA_PATH, filename)
-            loader = loader_class(file_path)
+            loader = loader_class(tmp_path)
             documents.extend(loader.load())
+            
+            # Delete temp file
+            os.unlink(tmp_path)
+    
     return documents
 
 

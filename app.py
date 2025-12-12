@@ -3,9 +3,9 @@ import os
 import shutil
 import gc
 import time
-from ingest import load_documents, split_documents, create_vectorstore
+from ingest import load_documents_from_files, split_documents, create_vectorstore
 from chain import ask_question
-from config import DATA_PATH, AVAILABLE_LLMS
+from config import AVAILABLE_LLMS
 
 # SESSION STATE
 if "messages" not in st.session_state:
@@ -56,50 +56,27 @@ with st.sidebar:
   )
   
   if st.button("Document Process (Ingest)"):
-      with st.spinner("Processing documents..."):
-          # Create a data folder if it does not already exist.
-          if not os.path.exists(DATA_PATH):
-              os.makedirs(DATA_PATH)
-          
-          # Save uploaded files to the data folder
-          if uploaded_files:
-              for old_file in os.listdir(DATA_PATH):
-                old_file_path = os.path.join(DATA_PATH, old_file)
-                try:
-                    os.remove(old_file_path)
-                except:
-                    pass
-              for uploaded_file in uploaded_files:
-                  save_path = os.path.join(DATA_PATH, uploaded_file.name)
-                  with open(save_path, "wb") as f:
-                      f.write(uploaded_file.getbuffer())
-              
-              # Run the ingest process
-              docs = load_documents()
-              chunks = split_documents(docs)
-              st.session_state.vectorstore = create_vectorstore(chunks)
-              st.cache_resource.clear()
-              st.success(f"Successfully processed {len(uploaded_files)} documents!")
-              st.session_state.uploader_key += 1
-              time.sleep(3)
-              st.rerun() 
-          else:
-              st.warning("Select the file before processing.")
+    with st.spinner("Processing documents..."):
+      if uploaded_files:
+        # Process directly from memory, not saving to data/
+        docs = load_documents_from_files(uploaded_files)
+        chunks = split_documents(docs)
+        st.session_state.vectorstore = create_vectorstore(chunks)
+        
+        st.success(f"Successfully processed {len(uploaded_files)} documents!")
+        st.session_state.uploader_key += 1
+        time.sleep(3)
+        st.rerun()
+      else:
+        st.warning("Select the file before processing.")
 
   # Reset Database
   st.divider()
   if st.button("🗑️ Reset Database", type="secondary"):
     st.session_state.vectorstore = None
     st.session_state.messages = []
-    # Delete physical files in the data folder
-    if os.path.exists(DATA_PATH):
-        for filename in os.listdir(DATA_PATH):
-            try:
-                os.remove(os.path.join(DATA_PATH, filename))
-            except:
-                pass
-    st.success("Database & uploaded files have been cleared!")
-    time.sleep(3)
+    st.success("Database & chat cleared!")
+    time.sleep(1)
     st.rerun()
 
   # Language Selector
