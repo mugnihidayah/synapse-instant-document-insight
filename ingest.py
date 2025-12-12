@@ -1,4 +1,5 @@
 import os
+import tempfile
 from langchain_community.document_loaders import (
     PyMuPDFLoader,
     TextLoader,
@@ -8,10 +9,9 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from config import EMBEDDING_MODEL, HUGGINGFACE_TOKEN
-from huggingface_hub import login
 
 if HUGGINGFACE_TOKEN:
-    login(token=HUGGINGFACE_TOKEN)
+    os.environ["HF_TOKEN"] = HUGGINGFACE_TOKEN
 
 # SETUP MODEL EMBEDDING
 def get_embedding_function():
