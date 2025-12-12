@@ -42,7 +42,15 @@ def load_documents_from_files(uploaded_files):
             # Load from temp file
             loader_class = loaders[ext]
             loader = loader_class(tmp_path)
-            documents.extend(loader.load())
+            docs = loader.load()
+            
+            # Update metadata with original file name and page +1
+            for doc in docs:
+                doc.metadata["source"] = uploaded_file.name
+                if "page" in doc.metadata:
+                    doc.metadata["page"] = doc.metadata["page"] + 1
+            
+            documents.extend(docs)
             
             # Delete temp file
             os.unlink(tmp_path)
