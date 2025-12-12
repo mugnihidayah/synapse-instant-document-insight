@@ -7,7 +7,7 @@ from langchain_community.document_loaders import (
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
-from config import DATA_PATH, EMBEDDING_MODEL, HUGGINGFACE_TOKEN
+from config import EMBEDDING_MODEL, HUGGINGFACE_TOKEN
 from huggingface_hub import login
 
 if HUGGINGFACE_TOKEN:

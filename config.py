@@ -4,7 +4,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Directory
-DATA_PATH = "./data"
 CACHE_DIR = "./opt"
 
 # API KEY
