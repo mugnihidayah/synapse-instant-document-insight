@@ -132,7 +132,13 @@ def ask_question(question, messages, vectorstore, model_name=LLM_MODEL, temperat
     
     context_text = "\n\n".join([res['text'] for res in top_results])
     history_text = format_history(messages[:-1])
-    sources = [res['meta'] for res in top_results]
+    sources = [
+        {
+            "metadata": res['meta'],
+            "text": res['text']
+        } 
+        for res in top_results
+    ]
     
     template = PROMPT_ID if language == "id" else PROMPT_EN
     prompt = PromptTemplate.from_template(template)

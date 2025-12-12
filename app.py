@@ -70,6 +70,11 @@ with st.sidebar:
   if st.button("Document Process (Ingest)"):
     with st.spinner("Processing documents..."):
       if uploaded_files:
+        if st.session_state.vectorstore is not None:
+            del st.session_state.vectorstore
+        st.session_state.vectorstore = None
+        st.session_state.messages = []
+        gc.collect()
         # Process directly from memory, not saving to data/
         docs = load_documents_from_files(uploaded_files)
         chunks = split_documents(docs)
@@ -134,9 +139,15 @@ if prompt := st.chat_input("Ask a question about this document..."):
             
             # Show Source (Collapsible)
             if sources:
-                with st.expander("📚 Reference Sources"):
-                    for i, src in enumerate(sources):
-                        st.markdown(f"**Source {i+1}:** {src.get('source', 'Unknown')} (Page: {src.get('page', '-')})")
+              with st.expander("📚 Reference Sources"):
+                  for i, src in enumerate(sources):
+                      metadata = src.get('metadata', {})
+                      text = src.get('text', 'No text available')
+                      
+                      st.markdown(f"**Source {i+1}:** {metadata.get('source', 'Unknown')} (Page: {metadata.get('page', '-')})")
+                      
+                      with st.expander(f"📄 View quoted text from Source {i+1}"):
+                          st.info(text)
             # Save assistant's answer to history
             st.session_state.messages.append({"role": "assistant", "content": response})
             

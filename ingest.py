@@ -1,4 +1,6 @@
 import os
+import uuid
+import chromadb
 import tempfile
 from langchain_community.document_loaders import (
     PyMuPDFLoader,
@@ -61,8 +63,8 @@ def load_documents_from_files(uploaded_files):
 # CHUNKING DOCUMENT
 def split_documents(documents):
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200,
+        chunk_size=500,
+        chunk_overlap=100,
         length_function=len,
         is_separator_regex=False,
     )
@@ -72,12 +74,20 @@ def split_documents(documents):
 
 # SAVE TO VECTOR DATABASE
 def create_vectorstore(chunks):
-    """Create in-memory vectorstore and return it"""
+    """Create truly in-memory vectorstore with unique collection"""
     if not chunks:
         return None
-
+    
+    # Create ephemeral client (truly in-memory)
+    client = chromadb.EphemeralClient()
+    
+    # Use unique collection name untuk setiap session
+    collection_name = f"session_{uuid.uuid4().hex[:8]}"
+    
     vectorstore = Chroma.from_documents(
-        chunks,
-        get_embedding_function(),
+        documents=chunks,
+        embedding=get_embedding_function(),
+        client=client,
+        collection_name=collection_name,
     )
     return vectorstore
