@@ -19,58 +19,77 @@
 
 ## ✨ Features
 
-| Feature | Description |
-|---------|-------------|
+| Feature                     | Description                                     |
+| --------------------------- | ----------------------------------------------- |
 | 📄 **Multi-format Support** | Upload and process PDF, DOCX, and TXT documents |
-| 🌐 **Bilingual Response** | Supports both Indonesian and English responses |
-| ⚡ **Streaming Output** | Real-time response generation for better UX |
-| 💬 **Chat Memory** | Context-aware conversations with chat history |
-| 🎛️ **Model Selection** | Choose from multiple LLM models |
-| 🔧 **Temperature Control** | Adjust creativity level of responses |
-| 🔄 **Database Management** | Easy reset and document management |
+| 🌐 **Bilingual Response**   | Supports both Indonesian and English responses  |
+| ⚡ **Streaming Output**     | Real-time response generation for better UX     |
+| 💬 **Chat Memory**          | Context-aware conversations with chat history   |
+| 🎛️ **Model Selection**      | Choose from multiple LLM models                 |
+| 🔧 **Temperature Control**  | Adjust creativity level of responses            |
+| 🔄 **Database Management**  | Easy reset and document management              |
+| 👥 **Multi-User Support**   | Each user gets isolated in-memory database      |
 
 ## 🚀 Installation
 
 ### Prerequisites
 
 - Python 3.11 or higher
-- Groq API Key ([Get it here](https://console.groq.com))
+- [Groq API Key](https://console.groq.com)
+- [HuggingFace Token](https://huggingface.co/settings/tokens)
 
 ### Setup
 
 1. **Clone the repository**
+
    ```bash
-   git clone https://github.com/yourusername/synapse.git
-   cd synapse
+   git clone https://github.com/mugnihidayah/synapse-instant-document-insight.git
+   cd synapse-instant-document-insight
    ```
 
 2. **Create virtual environment**
+
    ```bash
    python -m venv venv
-   
+
    # Windows
    venv\Scripts\activate
-   
+
    # Linux/macOS
    source venv/bin/activate
    ```
 
 3. **Install dependencies**
+
    ```bash
    pip install -r requirements.txt
    ```
 
 4. **Configure environment variables**
-   
+
    Create a `.env` file in the root directory:
+
    ```env
    GROQ_API_KEY=your_groq_api_key_here
+   HUGGINGFACE_TOKEN=hf_your_token_here
    ```
 
 5. **Run the application**
    ```bash
    streamlit run app.py
    ```
+
+## ☁️ Deploy to Streamlit Cloud
+
+1. Push your code to GitHub
+2. Go to [Streamlit Cloud](https://streamlit.io/cloud)
+3. Connect your repository
+4. Add secrets in **Settings > Secrets**:
+   ```toml
+   GROQ_API_KEY = "your_groq_api_key"
+   HUGGINGFACE_TOKEN = "hf_your_token"
+   ```
+5. Deploy!
 
 ## 📖 Usage
 
@@ -81,11 +100,11 @@
 
 ### Configuration Options
 
-| Option | Description |
-|--------|-------------|
-| **AI Model** | Select from available LLM models |
-| **Temperature** | 0.0 (focused) to 1.0 (creative) |
-| **Language** | Choose response language (ID/EN) |
+| Option          | Description                      |
+| --------------- | -------------------------------- |
+| **AI Model**    | Select from available LLM models |
+| **Temperature** | 0.0 (focused) to 1.0 (creative)  |
+| **Language**    | Choose response language (ID/EN) |
 
 ## 🛠️ Tech Stack
 
@@ -117,7 +136,7 @@
 </td>
 <td>
 
-- ChromaDB
+- ChromaDB (In-Memory)
 
 </td>
 </tr>
@@ -133,8 +152,7 @@ synapse/
 ├── config.py           # Configuration settings
 ├── requirements.txt    # Python dependencies
 ├── .env                # Environment variables (not tracked)
-├── data/               # Uploaded documents (not tracked)
-└── vectorstore/        # ChromaDB storage (not tracked)
+└── data/               # Uploaded documents (not tracked)
 ```
 
 ## 🔧 Configuration
@@ -144,7 +162,7 @@ All configuration options are centralized in `config.py`:
 ```python
 # Paths
 DATA_PATH = "./data"
-DB_PATH = "./vectorstore"
+CACHE_DIR = "./opt"
 
 # Models
 EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"

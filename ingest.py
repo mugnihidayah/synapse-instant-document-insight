@@ -8,6 +8,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from config import DATA_PATH, EMBEDDING_MODEL, HUGGINGFACE_TOKEN
+from huggingface_hub import login
 
 if HUGGINGFACE_TOKEN:
     login(token=HUGGINGFACE_TOKEN)
