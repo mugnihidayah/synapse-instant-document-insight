@@ -17,6 +17,9 @@ if "uploader_key" not in st.session_state:
 if "vectorstore" not in st.session_state:
     st.session_state.vectorstore = None
 
+if "active_document" not in st.session_state:
+    st.session_state.active_document = None
+
 # PAGE CONFIGURATION
 st.set_page_config(
   page_title="Synapse",
@@ -37,6 +40,15 @@ with st.sidebar:
       st.success("Chat history cleared! Start a new conversation.")
       st.rerun()
 
+  st.divider()
+
+  st.subheader("📄 Active Document")
+  if st.session_state.active_document:
+      st.success(f"✅ {st.session_state.active_document['name']}")
+      st.caption(f"📊 {st.session_state.active_document['chunks']} chunks processed")
+  else:
+      st.warning("No document loaded")
+  
   st.divider()
 
   # Model Selector
@@ -62,7 +74,10 @@ with st.sidebar:
         docs = load_documents_from_files(uploaded_files)
         chunks = split_documents(docs)
         st.session_state.vectorstore = create_vectorstore(chunks)
-        
+        st.session_state.active_document = {
+            "name": ", ".join([f.name for f in uploaded_files]),
+            "chunks": len(chunks),
+        }
         st.success(f"Successfully processed {len(uploaded_files)} documents!")
         st.session_state.uploader_key += 1
         time.sleep(3)
@@ -75,6 +90,7 @@ with st.sidebar:
   if st.button("🗑️ Reset Database", type="secondary"):
     st.session_state.vectorstore = None
     st.session_state.messages = []
+    st.session_state.active_document = None
     st.success("Database & chat cleared!")
     time.sleep(1)
     st.rerun()
