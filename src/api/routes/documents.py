@@ -103,6 +103,11 @@ async def upload_documents(
         )
     supported = get_supported_extensions()
     for file in files:
+        if file.filename is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File must have a filename",
+            )
         ext = "." + file.filename.split(".")[-1].lower()
         if ext not in supported:
             raise HTTPException(
@@ -113,6 +118,8 @@ async def upload_documents(
         # load documents
         all_documents = []
         for file in files:
+            if file.filename is None:
+                continue  # skip files without filename
             docs = load_document_from_upload(file.file, file.filename)
             all_documents.extend(docs)
         if not all_documents:
