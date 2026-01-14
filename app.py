@@ -1,11 +1,11 @@
 import streamlit as st
-import os
-import shutil
 import gc
 import time
-from ingest import load_documents_from_files, split_documents, create_vectorstore
-from chain import ask_question
-from config import AVAILABLE_LLMS
+from src.ingestion.loaders import load_documents_from_uploads
+from src.ingestion.chunkers import split_documents
+from src.ingestion.vectorstore import create_vectorstore
+from src.rag.chain import ask_question
+from src.core.config import settings
 
 # SESSION STATE
 if "messages" not in st.session_state:
@@ -52,7 +52,7 @@ with st.sidebar:
   st.divider()
 
   # Model Selector
-  selected_model = st.selectbox("Select AI Model:", AVAILABLE_LLMS, index=0)
+  selected_model = st.selectbox("Select AI Model:", settings.available_llms, index=0)
   temperature = st.slider("Creativity (Temperature):", 0.0, 1.0, 0.3)
     
   st.divider()
@@ -76,7 +76,7 @@ with st.sidebar:
         st.session_state.messages = []
         gc.collect()
         # Process directly from memory, not saving to data/
-        docs = load_documents_from_files(uploaded_files)
+        docs = load_documents_from_uploads(uploaded_files)
         chunks = split_documents(docs)
         st.session_state.vectorstore = create_vectorstore(chunks)
         st.session_state.active_document = {

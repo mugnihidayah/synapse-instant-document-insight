@@ -1,0 +1,117 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+[project]
+name = "synapse-rag"
+version = "0.1.0"
+description = "Production-ready RAG system for document Q&A"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [
+    {name = "Mugni Hidayah", email = "mugnihidayahwork@gmail.com"}
+]
+keywords = ["rag", "llm", "langchain", "chromadb", "ai"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "langchain>=0.3.0",
+    "langchain-community>=0.3.0",
+    "langchain-groq>=0.2.0",
+    "langchain-huggingface>=0.1.0",
+    "langchain-chroma>=0.1.0",
+    "chromadb>=0.4.0,<0.5.0",
+    "onnxruntime>=1.14.1",
+    "flashrank>=0.2.0",
+    "pymupdf>=1.24.0",
+    "docx2txt>=0.8",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "numpy<2.0",
+    "sentence-transformers>=2.2.2",
+]
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-asyncio>=0.23.0",
+    "mypy>=1.10.0",
+    "ruff>=0.5.0",
+    "pre-commit>=3.7.0",
+]
+api = [
+    "fastapi>=0.111.0",
+    "uvicorn>=0.30.0",
+    "python-multipart>=0.0.9",
+]
+streamlit = [
+    "streamlit>=1.38.0",
+]
+all = [
+    "synapse-rag[dev,api,streamlit]",
+]
+[project.urls]
+Homepage = "https://github.com/mugnihidayah/synapse-instant-document-insight"
+Repository = "https://github.com/mugnihidayah/synapse-rag"
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+]
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "I",
+    "UP",
+    "B",
+    "C4",
+    "SIM",
+]
+ignore = [
+    "E501",
+]
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+strict_optional = true
+disallow_untyped_defs = false
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "-v --cov=src --cov-report=term-missing --cov-report=html"
+asyncio_mode = "auto"
+markers = [
+    "slow: marks tests as slow (skip with -m 'not slow')",
+]
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*", "*/__init__.py"]
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
