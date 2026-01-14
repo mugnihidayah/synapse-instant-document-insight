@@ -36,10 +36,10 @@ async def generate_stream(question: str, messages: list[dict], vectorstore, lang
     for chunk in response_generator:
       full_response += chunk
       # SSE format: data: {json}\n\n
-      yield f"data: {json.dumps({"chunk": chunk})}\n\n"
+      yield f"data: {json.dumps({'chunk': chunk})}\n\n"
 
     # send sources at the end
-    yield f"data: {json.dumps({"sources": sources})}\n\n"
+    yield f"data: {json.dumps({'sources': sources})}\n\n"
 
     # signal completion
     yield f"data: {json.dumps({'done': True, 'full_response': full_response})}\n\n"

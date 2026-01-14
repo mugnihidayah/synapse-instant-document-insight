@@ -152,13 +152,7 @@ async def upload_documents(session_id: str, files: list[UploadFile] = File(...))
   except DocumentProcessingError as e:
     raise HTTPException(
       status_code=status.HTTP_400_BAD_REQUEST,
-      detail=str(e)
-    )
-
-  except VectorStoreError as e:
-    raise HTTPException(
-      status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-      detail=str(e)
+      detail=str(e) from e
     )
 
   except VectorStoreError as e:
@@ -177,6 +171,6 @@ def get_supported_formats() -> dict:
   """
 
   return {
-    "formats": get_supported_extentions(),
+    "formats": get_supported_extensions(),
     "description": "Supported document formats for upload",
   }
