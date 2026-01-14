@@ -1,193 +1,101 @@
 <div align="center">
-
 # 🧠 Synapse
-
 ### Instant Document Insights
-
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
-[![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io)
-[![LangChain](https://img.shields.io/badge/LangChain-🦜-1C3C3C?style=for-the-badge)](https://langchain.com)
+[![CI](https://github.com/mugnihidayah/synapse-instant-document-insight/workflows/CI/badge.svg)](https://github.com/mugnihidayah/synapse-instant-document-insight/actions)
+[![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://docker.com)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
-
-**An Advanced RAG (Retrieval-Augmented Generation) System for intelligent document Q&A**
-
-[Features](#-features) • [Installation](#-installation) • [Usage](#-usage) • [Tech Stack](#-tech-stack) • [Contributing](#-contributing)
-
+**Production-Ready RAG (Retrieval-Augmented Generation) API for intelligent document Q&A**
+[Features](#-features) • [Quick Start](#-quick-start) • [API Docs](#-api-documentation) • [Docker](#-docker) • [Tech Stack](#-tech-stack)
 </div>
-
 ---
-
 ## ✨ Features
-
-| Feature                     | Description                                     |
-| --------------------------- | ----------------------------------------------- |
-| 📄 **Multi-format Support** | Upload and process PDF, DOCX, and TXT documents |
-| 🌐 **Bilingual Response**   | Supports both Indonesian and English responses  |
-| ⚡ **Streaming Output**     | Real-time response generation for better UX     |
-| 💬 **Chat Memory**          | Context-aware conversations with chat history   |
-| 🎛️ **Model Selection**      | Choose from multiple LLM models                 |
-| 🔧 **Temperature Control**  | Adjust creativity level of responses            |
-| 🔄 **Database Management**  | Easy reset and document management              |
-| 👥 **Multi-User Support**   | Each user gets isolated in-memory database      |
-
-## 🚀 Installation
-
-### Prerequisites
-
-- Python 3.11 or higher
-- [Groq API Key](https://console.groq.com)
-- [HuggingFace Token](https://huggingface.co/settings/tokens)
-
-### Setup
-
-1. **Clone the repository**
-
-   ```bash
-   git clone https://github.com/mugnihidayah/synapse-instant-document-insight.git
-   cd synapse-instant-document-insight
-   ```
-
-2. **Create virtual environment**
-
-   ```bash
-   python -m venv venv
-
-   # Windows
-   venv\Scripts\activate
-
-   # Linux/macOS
-   source venv/bin/activate
-   ```
-
-3. **Install dependencies**
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Configure environment variables**
-
-   Create a `.env` file in the root directory:
-
-   ```env
-   GROQ_API_KEY=your_groq_api_key_here
-   HUGGINGFACE_TOKEN=hf_your_token_here
-   ```
-
-5. **Run the application**
-   ```bash
-   streamlit run app.py
-   ```
-
-## ☁️ Deploy to Streamlit Cloud
-
-1. Push your code to GitHub
-2. Go to [Streamlit Cloud](https://streamlit.io/cloud)
-3. Connect your repository
-4. Add secrets in **Settings > Secrets**:
-   ```toml
-   GROQ_API_KEY = "your_groq_api_key"
-   HUGGINGFACE_TOKEN = "hf_your_token"
-   ```
-5. Deploy!
-
-## 📖 Usage
-
-1. **Upload Documents** — Use the sidebar to upload PDF, DOCX, or TXT files
-2. **Process Documents** — Click "Document Process (Ingest)" to index your documents
-3. **Ask Questions** — Type your question in the chat input
-4. **View Sources** — Expand "Reference Sources" to see where the answer came from
-
-### Configuration Options
-
-| Option          | Description                      |
-| --------------- | -------------------------------- |
-| **AI Model**    | Select from available LLM models |
-| **Temperature** | 0.0 (focused) to 1.0 (creative)  |
-| **Language**    | Choose response language (ID/EN) |
-
-## 🛠️ Tech Stack
-
-<table>
-<tr>
-<td align="center"><b>Frontend</b></td>
-<td align="center"><b>Backend</b></td>
-<td align="center"><b>AI/ML</b></td>
-<td align="center"><b>Database</b></td>
-</tr>
-<tr>
-<td>
-
-- Streamlit
-
-</td>
-<td>
-
-- Python
-- LangChain
-
-</td>
-<td>
-
-- Groq LLM
-- HuggingFace Embeddings
-- FlashRank Reranker
-
-</td>
-<td>
-
-- ChromaDB (In-Memory)
-
-</td>
-</tr>
-</table>
-
-## 📁 Project Structure
-
-```
-synapse/
-├── app.py              # Main Streamlit application
-├── chain.py            # RAG chain logic & LLM integration
-├── ingest.py           # Document processing & ingestion
-├── config.py           # Configuration settings
-├── requirements.txt    # Python dependencies
-├── .env                # Environment variables (not tracked)
-└── data/               # Uploaded documents (not tracked)
-```
-
-## 🔧 Configuration
-
-All configuration options are centralized in `config.py`:
-
-```python
-# Paths
-DATA_PATH = "./data"
-CACHE_DIR = "./opt"
-
-# Models
-EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-LLM_MODEL = "llama-3.3-70b-versatile"
-RERANKER_MODEL = "ms-marco-MiniLM-L-12-v2"
-```
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
+| Feature | Description |
+|---------|-------------|
+| 📄 **Multi-format Support** | PDF, DOCX, and TXT documents |
+| 🚀 **REST API** | Production-ready FastAPI with Swagger docs |
+| ⚡ **Streaming Responses** | Real-time SSE streaming like ChatGPT |
+| 🌐 **Bilingual** | Indonesian and English responses |
+| 💬 **Session Management** | Multi-user isolated sessions |
+| 🐳 **Docker Ready** | Containerized deployment |
+| 🔄 **CI/CD** | Automated testing with GitHub Actions |
+| ✅ **73% Test Coverage** | Unit and integration tests |
+| 🎛️ **Type Safe** | Full type hints with MyPy |
 ---
+## 🚀 Quick Start
+### Option 1: Docker (Recommended)
+```bash
+git clone https://github.com/mugnihidayah/synapse-instant-document-insight.git
+cd synapse-instant-document-insight
+echo "GROQ_API_KEY=your_key" > .env
+docker compose up -d
+# Access: http://localhost:8000/docs
+Option 2: Local Development
+git clone https://github.com/mugnihidayah/synapse-instant-document-insight.git
+cd synapse-instant-document-insight
+python -m venv venv && source venv/bin/activate
+pip install -e ".[dev,api]"
+cp .env.example .env  # Edit with your API keys
+# Run API
+uvicorn src.api.main:app --reload
+# Or Streamlit UI
+streamlit run app.py
+📡 API Documentation
+Base URL: http://localhost:8000/api/v1
 
-<div align="center">
+Method	Endpoint	Description
+POST	/documents/sessions	Create session
+GET	/documents/session/{id}	Get session info
+POST	/documents/upload/{id}	Upload documents
+POST	/query/{id}	Query (sync)
+POST	/query/stream/{id}	Query (streaming)
+Example
+# Create session
+SESSION=$(curl -s -X POST http://localhost:8000/api/v1/documents/sessions | jq -r '.session_id')
+# Upload
+curl -X POST "http://localhost:8000/api/v1/documents/upload/$SESSION" -F "files=@doc.pdf"
+# Query
+curl -X POST "http://localhost:8000/api/v1/query/stream/$SESSION" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What is this about?", "language": "en"}'
+Swagger UI: http://localhost:8000/docs
 
-**Built with ❤️ using Streamlit & LangChain**
+🐳 Docker
+docker compose up -d      # Start
+docker compose logs -f    # Logs
+docker compose down       # Stop
+🛠️ Tech Stack
+Backend	AI/ML	DevOps	Testing
+FastAPI	LangChain	Docker	Pytest
+Python 3.12	Groq LLM	GitHub Actions	MyPy
+Pydantic	HuggingFace	CI/CD	Ruff
+Uvicorn	ChromaDB		73% Coverage
+📁 Project Structure
+synapse-instant-document-insight/
+├── src/
+│   ├── core/           # Config, exceptions
+│   ├── rag/            # RAG chain, prompts
+│   ├── ingestion/      # Loaders, chunkers
+│   └── api/            # FastAPI endpoints
+├── tests/              # Unit tests
+├── .github/workflows/  # CI/CD
+├── app.py              # Streamlit UI
+├── Dockerfile
+├── docker-compose.yml
+└── pyproject.toml
+🧪 Development
+pytest tests/ -v --cov=src    # Tests
+ruff check src/               # Lint
+mypy src/                     # Type check
+🔧 Configuration
+GROQ_API_KEY=gsk_your_key          # Required
+HUGGINGFACE_TOKEN=hf_your_token    # Optional
+📄 License
+MIT License - see 
 
-</div>
+LICENSE
+
+Built with ❤️ using FastAPI, LangChain & Docker
+
+```
