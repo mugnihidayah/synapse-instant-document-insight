@@ -84,16 +84,17 @@ Pertanyaan: {question}
 Jawaban:
 """
 
+
 def get_prompt(language: str = "id") -> str:
-  """
-  Get prompt template based on language
+    """
+    Get prompt template based on language
 
-  Args:
-    language: Language code ("id" for Indonesian, "en" for English)
+    Args:
+      language: Language code ("id" for Indonesian, "en" for English)
 
-  Returns:
-    Prompt template string
-  """
-  if language == "en":
-    return PROMPT_EN
-  return PROMPT_ID
+    Returns:
+      Prompt template string
+    """
+    if language == "en":
+        return PROMPT_EN
+    return PROMPT_ID

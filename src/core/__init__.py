@@ -7,22 +7,22 @@ This module provides:
 - Shared constants and utilities
 """
 
-from src.core.config import settings, Settings, get_settings
+from src.core.config import Settings, get_settings, settings
 from src.core.exceptions import (
-  SynapseError,
-  DocumentProcessingError,
-  VectorStoreError,
-  RAGError,
-  ConfigurationError,
+    ConfigurationError,
+    DocumentProcessingError,
+    RAGError,
+    SynapseError,
+    VectorStoreError,
 )
 
 __all__: list[str] = [
-  "Settings",
-  "get_settings",
-  "settings",
-  "SynapseError",
-  "DocumentProcessingError",
-  "VectorStoreError",
-  "RAGError",
-  "ConfigurationError",
+    "Settings",
+    "get_settings",
+    "settings",
+    "SynapseError",
+    "DocumentProcessingError",
+    "VectorStoreError",
+    "RAGError",
+    "ConfigurationError",
 ]
