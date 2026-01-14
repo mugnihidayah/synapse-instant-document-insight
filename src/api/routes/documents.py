@@ -22,6 +22,7 @@ from src.ingestion.vectorstore import create_vectorstore
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
+
 # SESSION MANAGEMENT
 @router.post("/sessions", response_model=SessionCreate)
 def create_session() -> SessionCreate:
@@ -32,6 +33,7 @@ def create_session() -> SessionCreate:
     """
     session = session_manager.create_session()
     return SessionCreate(session_id=session.id)
+
 
 @router.get("/sessions/{session_id}", response_model=SessionInfo)
 def get_session(session_id: str) -> SessionInfo:
@@ -55,6 +57,7 @@ def get_session(session_id: str) -> SessionInfo:
         is_ready=session.is_ready(),
     )
 
+
 @router.delete("/sessions/{session_id}")
 def delete_session(session_id: str) -> dict:
     """
@@ -69,6 +72,7 @@ def delete_session(session_id: str) -> dict:
             detail=f"Session {session_id} not found",
         )
     return {"message": f"Session {session_id} deleted"}
+
 
 # DOCUMENT UPLOAD
 @router.post("/upload/{session_id}", response_model=DocumentUploadResponse)
@@ -141,6 +145,7 @@ async def upload_documents(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),
         ) from e
+
 
 @router.get("/supported-formats")
 def get_supported_formats() -> dict:
