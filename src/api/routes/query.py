@@ -128,9 +128,7 @@ async def query(
     session = await session_service.get_session_by_str(db, session_id)
 
     if not session:
-        logger.warning(
-            "query_failed", reason="session_not_found", session_id=session_id
-        )
+        logger.warning("query_failed", reason="session_not_found", session_id=session_id)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Session {session_id} not found",

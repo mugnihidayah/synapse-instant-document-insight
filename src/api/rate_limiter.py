@@ -9,17 +9,18 @@ from starlette.requests import Request
 
 
 def get_api_key_or_ip(request: Request) -> str:
-  """
-  Get rate limit key from API key header, fallback to IP
-  This ensures rate limiting is per user, not per IP
-  """
-  # get API key from header
-  api_key = request.headers.get("X-API-key")
+    """
+    Get rate limit key from API key header, fallback to IP
+    This ensures rate limiting is per user, not per IP
+    """
+    # get API key from header
+    api_key = request.headers.get("X-API-key")
 
-  if api_key:
-    return f"key: {api_key[:16]}"
+    if api_key:
+        return f"key: {api_key[:16]}"
 
-  return f"ip: {get_remote_address(request)}"
+    return f"ip: {get_remote_address(request)}"
+
 
 # create limiter instance
 limiter = Limiter(key_func=get_api_key_or_ip)
