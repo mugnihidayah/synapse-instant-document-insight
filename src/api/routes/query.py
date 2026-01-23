@@ -103,10 +103,10 @@ async def query_stream(
     except Exception as e:
       yield f"data: {json.dumps({'error': str(e)})}\n\n"
     
-    return StreamingResponse(
-      generate(),
-      media_type="text/event-stream",
-    )
+  return StreamingResponse(
+    generate(),
+    media_type="text/event-stream",
+  )
 
 
 @router.post("/{session_id}", response_model=QueryResponse)
