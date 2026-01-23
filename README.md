@@ -23,7 +23,7 @@
 
 | Feature                  | Description                                                      |
 | ------------------------ | ---------------------------------------------------------------- |
-| **Multi-format Support** | PDF, DOCX, TXT — more formats coming                             |
+| **Multi-format Support** | PDF, DOCX, TXT, more formats coming                             |
 | **REST API**             | FastAPI with auto-generated Swagger docs                         |
 | **Streaming**            | SSE streaming responses, ChatGPT-style                           |
 | **Bilingual**            | Responds in Indonesian or English based on your preference       |
