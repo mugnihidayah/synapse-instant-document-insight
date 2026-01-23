@@ -7,68 +7,75 @@ from pydantic import BaseModel, Field
 
 # SESSION SCHEMAS
 class SessionCreate(BaseModel):
-    """Response after creating a session"""
+  """Response after creating a session"""
 
-    session_id: str
-    message: str = "Session created successfully"
+  session_id: str
+  message: str = "Session created successfully"
 
 
 class SessionInfo(BaseModel):
-    """Session information"""
+  """Session information"""
 
-    session_id: str
-    created_at: datetime
-    document_count: int
-    is_ready: bool
+  session_id: str
+  created_at: datetime
+  document_count: int
+  is_ready: bool
 
 
 # DOCUMENT SCHEMAS
 class DocumentUploadResponse(BaseModel):
-    """Response after uploading documents"""
+  """Response after uploading documents"""
 
-    session_id: str
-    document_processed: int
-    chunks_created: int
-    message: str = "Documents processed successfully"
+  session_id: str
+  document_processed: int
+  chunks_created: int
+  message: str = "Documents processed successfully"
 
 
 class DocumentInfo(BaseModel):
-    """Information about a processed document"""
+  """Information about a processed document"""
 
-    filename: str
-    chunks: int
-    status: str
+  filename: str
+  chunks: int
+  status: str
 
 
 # QUERY SCHEMAS
 class QueryRequest(BaseModel):
-    """Request for RAG query"""
+  """Request for RAG query"""
 
-    question: str = Field(
-        ...,
-        min_length=1,
-        max_length=2000,
-        description="Question to ask about the documents",
-    )
+  question: str = Field(
+    ...,
+    min_length=1,
+    max_length=2000,
+    description="Question to ask about the documents",
+  )
 
-    language: str = Field(
-        default="id", pattern="^(id|en)$", description="Response language: 'id' or 'en'"
-    )
+  language: str = Field(
+    default="id", pattern="^(id|en)$", description="Response language: 'id' or 'en'"
+  )
 
-    model: str | None = Field(default=None, description="LLM model to use (optional)")
+  model: str | None = Field(default=None, description="LLM model to use (optional)")
+
+  temperature: float = Field(
+    default=0.3,
+    ge=0,
+    le=1,
+    description="Temperature for LLM (optional)",
+  )
 
 
 class QueryResponse(BaseModel):
-    """Response from RAG query"""
+  """Response from RAG query"""
 
-    answer: str
-    sources: list[dict]
-    model_used: str
+  answer: str
+  sources: list[dict]
+  model_used: str
 
 
 # ERROR SCHEMAS
 class ErrorResponse(BaseModel):
-    """Error response"""
+  """Error response"""
 
-    error: str
-    detail: str | None = None
+  error: str
+  detail: str | None = None

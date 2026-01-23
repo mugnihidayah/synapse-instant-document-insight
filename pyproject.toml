@@ -11,7 +11,7 @@ requires-python = ">=3.11"
 authors = [
     {name = "Mugni Hidayah", email = "mugnihidayahwork@gmail.com"}
 ]
-keywords = ["rag", "llm", "langchain", "chromadb", "ai"]
+keywords = ["rag", "llm", "langchain", "pgvector", "fastapi", "ai"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -24,8 +24,6 @@ dependencies = [
     "langchain-community>=0.3.0",
     "langchain-groq>=0.2.0",
     "langchain-huggingface>=0.1.0",
-    "langchain-chroma>=0.1.0",
-    "chromadb>=0.4.0,<0.5.0",
     "onnxruntime>=1.14.1",
     "flashrank>=0.2.0",
     "pymupdf>=1.24.0",
@@ -49,6 +47,15 @@ api = [
     "fastapi>=0.111.0",
     "uvicorn>=0.30.0",
     "python-multipart>=0.0.9",
+    "sse-starlette>=2.0.0",
+    # Database
+    "asyncpg>=0.30.0",
+    "sqlalchemy[asyncio]>=2.0.0",
+    "pgvector>=0.3.0",
+    "alembic>=1.14.0",
+    # Security & Utils
+    "slowapi>=0.1.9",
+    "structlog>=24.0.0",
 ]
 streamlit = [
     "streamlit>=1.38.0",

@@ -7,10 +7,11 @@
 [![CI](https://github.com/mugnihidayah/synapse-instant-document-insight/workflows/CI/badge.svg)](https://github.com/mugnihidayah/synapse-instant-document-insight/actions)
 [![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://postgresql.org)
 [![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://docker.com)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
-**Production-Ready RAG (Retrieval-Augmented Generation) API for intelligent document Q&A**
+**A RAG API for document Q&A — upload your PDFs, ask questions, get answers with citations.**
 
 [Features](#-features) • [Quick Start](#-quick-start) • [API Docs](#-api-documentation) • [Docker](#-docker) • [Tech Stack](#-tech-stack)
 
@@ -18,37 +19,44 @@
 
 ---
 
-## ✨ Features
+## Features
 
-| Feature                     | Description                                |
-| --------------------------- | ------------------------------------------ |
-| 📄 **Multi-format Support** | PDF, DOCX, and TXT documents               |
-| 🚀 **REST API**             | Production-ready FastAPI with Swagger docs |
-| ⚡ **Streaming Responses**  | Real-time SSE streaming like ChatGPT       |
-| 🌐 **Bilingual**            | Indonesian and English responses           |
-| 💬 **Session Management**   | Multi-user isolated sessions               |
-| 🐳 **Docker Ready**         | Containerized deployment                   |
-| 🔄 **CI/CD**                | Automated testing with GitHub Actions      |
-| ✅ **73% Test Coverage**    | Unit and integration tests                 |
-| 🎛️ **Type Safe**            | Full type hints with MyPy                  |
+| Feature                  | Description                                                      |
+| ------------------------ | ---------------------------------------------------------------- |
+| **Multi-format Support** | PDF, DOCX, TXT — more formats coming                             |
+| **REST API**             | FastAPI with auto-generated Swagger docs                         |
+| **Streaming**            | SSE streaming responses, ChatGPT-style                           |
+| **Bilingual**            | Responds in Indonesian or English based on your preference       |
+| **Session-based**        | Each user gets isolated document storage                         |
+| **API Key Auth**         | SHA256 hashed keys, stored in PostgreSQL                         |
+| **Rate Limiting**        | 50 queries/min per key (configurable)                            |
+| **Vector Search**        | PostgreSQL + pgvector for similarity search (384-dim embeddings) |
+| **JSON Logging**         | Structured logs for production debugging                         |
+| **Dockerized**           | One command to run everything                                    |
+| **Tested**               | Unit tests with Pytest, CI/CD with GitHub Actions                |
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
-### Option 1: Docker (Recommended)
+### Docker (recommended)
 
 ```bash
 git clone https://github.com/mugnihidayah/synapse-instant-document-insight.git
 cd synapse-instant-document-insight
 
-echo "GROQ_API_KEY=your_key" > .env
+# Add your Groq API key
+echo "GROQ_API_KEY=gsk_your_key_here" > .env
+
+# Start API + PostgreSQL
 docker compose up -d
 
-# Access: http://localhost:8000/docs
+# Open http://localhost:8000/docs
 ```
 
-### Option 2: Local Development
+### Local Development
+
+**Linux/macOS:**
 
 ```bash
 git clone https://github.com/mugnihidayah/synapse-instant-document-insight.git
@@ -57,81 +65,172 @@ cd synapse-instant-document-insight
 python -m venv venv && source venv/bin/activate
 pip install -e ".[dev,api]"
 
-cp .env.example .env  # Edit with your API keys
+# Start PostgreSQL only
+docker compose up db -d
 
-# Run API
+# Create tables
+psql $DATABASE_URL < scripts/init.sql
+
+# Run the API
 uvicorn src.api.main:app --reload
+```
 
-# Or Streamlit UI
-streamlit run app.py
+**Windows (PowerShell):**
+
+```powershell
+git clone https://github.com/mugnihidayah/synapse-instant-document-insight.git
+cd synapse-instant-document-insight
+
+python -m venv venv
+venv\Scripts\activate
+pip install -e ".[dev,api]"
+
+# Start PostgreSQL only
+docker compose up db -d
+
+# Create tables (use psql or run manually in pgAdmin)
+# Copy contents of scripts/init.sql and execute in your PostgreSQL client
+
+# Run the API
+uvicorn src.api.main:app --reload
 ```
 
 ---
 
-## 📡 API Documentation
+## API Documentation
 
 **Base URL:** `http://localhost:8000/api/v1`
 
-| Method | Endpoint                  | Description       |
-| ------ | ------------------------- | ----------------- |
-| `POST` | `/documents/sessions`     | Create session    |
-| `GET`  | `/documents/session/{id}` | Get session info  |
-| `POST` | `/documents/upload/{id}`  | Upload documents  |
-| `POST` | `/query/{id}`             | Query (sync)      |
-| `POST` | `/query/stream/{id}`      | Query (streaming) |
+### Authentication
 
-### Example
+All endpoints except `/keys/` need an API key:
 
 ```bash
-# Create session
-SESSION=$(curl -s -X POST http://localhost:8000/api/v1/documents/sessions | jq -r '.session_id')
-
-# Upload
-curl -X POST "http://localhost:8000/api/v1/documents/upload/$SESSION" -F "files=@doc.pdf"
-
-# Query
-curl -X POST "http://localhost:8000/api/v1/query/stream/$SESSION" \
+# First, create a key
+curl -X POST localhost:8000/api/v1/keys/ \
   -H "Content-Type: application/json" \
-  -d '{"question": "What is this about?", "language": "en"}'
+  -d '{"name": "my-app"}'
+
+# Response: {"api_key": "sk-abc123...", "key_id": "...", ...}
+# Save that key! It won't be shown again.
+
+# Then use it in all requests
+curl -H "X-API-Key: sk-abc123..." localhost:8000/api/v1/documents/sessions
 ```
 
-**Swagger UI:** `http://localhost:8000/docs`
+### Endpoints
 
----
+| Method   | Endpoint                   | What it does                | Needs auth? |
+| -------- | -------------------------- | --------------------------- | ----------- |
+| `POST`   | `/keys/`                   | Get an API key              | No          |
+| `GET`    | `/keys/`                   | List your keys (hashed)     | No          |
+| `DELETE` | `/keys/{id}`               | Revoke a key                | No          |
+| `POST`   | `/documents/sessions`      | Start a new session         | Yes         |
+| `GET`    | `/documents/sessions/{id}` | Check session status        | Yes         |
+| `DELETE` | `/documents/sessions/{id}` | Delete session and docs     | Yes         |
+| `POST`   | `/documents/upload/{id}`   | Upload files to session     | Yes         |
+| `POST`   | `/query/{id}`              | Ask a question              | Yes         |
+| `POST`   | `/query/stream/{id}`       | Ask with streaming response | Yes         |
 
-## 🐳 Docker
+### Typical Flow
 
 ```bash
-docker compose up -d      # Start
-docker compose logs -f    # Logs
-docker compose down       # Stop
+# 1. Get API key (do this once)
+API_KEY=$(curl -s -X POST localhost:8000/api/v1/keys/ \
+  -H "Content-Type: application/json" \
+  -d '{"name": "test"}' | jq -r '.api_key')
+
+# 2. Create a session
+SESSION=$(curl -s -X POST localhost:8000/api/v1/documents/sessions \
+  -H "X-API-Key: $API_KEY" | jq -r '.session_id')
+
+# 3. Upload your document
+curl -X POST "localhost:8000/api/v1/documents/upload/$SESSION" \
+  -H "X-API-Key: $API_KEY" \
+  -F "files=@quarterly-report.pdf"
+
+# 4. Ask questions
+curl -X POST "localhost:8000/api/v1/query/$SESSION" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What was the revenue growth?", "language": "en"}'
+```
+
+**Swagger UI:** http://localhost:8000/docs — try it interactively.
+
+---
+
+## Rate Limits
+
+Limits are per API key:
+
+| Endpoint type | Limit     |
+| ------------- | --------- |
+| Queries       | 50/minute |
+| Uploads       | 5/minute  |
+| Session ops   | 20/minute |
+
+Hit the limit? You'll get `429 Too Many Requests`. Wait a minute and retry.
+
+---
+
+## Docker
+
+```bash
+docker compose up -d        # Start everything
+docker compose logs -f api  # Watch API logs
+docker compose down         # Stop
 ```
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
-| Backend     | AI/ML       | DevOps         | Testing      |
-| ----------- | ----------- | -------------- | ------------ |
-| FastAPI     | LangChain   | Docker         | Pytest       |
-| Python 3.12 | Groq LLM    | GitHub Actions | MyPy         |
-| Pydantic    | HuggingFace | CI/CD          | Ruff         |
-| Uvicorn     | ChromaDB    |                | 73% Coverage |
+**Backend:** FastAPI, SQLAlchemy, Pydantic, Uvicorn
+
+**Database:** PostgreSQL with pgvector extension
+
+**AI/ML:** LangChain, Groq LLM, HuggingFace embeddings (384-dim)
+
+**Auth & Security:** SHA256 key hashing, slowapi rate limiting
+
+**Logging:** structlog (JSON format)
+
+**DevOps:** Docker, GitHub Actions CI
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 synapse-instant-document-insight/
 ├── src/
-│   ├── core/           # Config, exceptions
-│   ├── rag/            # RAG chain, prompts
-│   ├── ingestion/      # Loaders, chunkers
-│   └── api/            # FastAPI endpoints
-├── tests/              # Unit tests
-├── .github/workflows/  # CI/CD
-├── app.py              # Streamlit UI
+│   ├── api/              # FastAPI app
+│   │   ├── routes/       # Endpoint handlers (documents, query, keys)
+│   │   ├── auth.py       # API key generation & validation
+│   │   ├── dependencies.py
+│   │   ├── rate_limiter.py
+│   │   ├── schemas.py    # Pydantic models
+│   │   └── main.py       # App factory
+│   ├── core/             # Shared utilities
+│   │   ├── config.py     # Settings (env vars)
+│   │   ├── exceptions.py
+│   │   └── logger.py     # Structured logging
+│   ├── db/               # Database layer
+│   │   ├── connection.py # Async engine & session
+│   │   └── models.py     # SQLAlchemy ORM models
+│   ├── ingestion/        # Document processing
+│   │   ├── loaders.py    # PDF, DOCX, TXT parsers
+│   │   ├── chunkers.py   # Text splitting
+│   │   └── pgvector_store.py  # Vector storage
+│   └── rag/              # AI/ML logic
+│       ├── chain.py      # LangChain RAG chain
+│       └── prompts.py    # System prompts (ID/EN)
+├── tests/                # Pytest test suite
+├── scripts/
+│   └── init.sql          # Database schema
+├── .github/workflows/    # CI/CD
+├── app.py                # Streamlit UI (optional)
 ├── Dockerfile
 ├── docker-compose.yml
 └── pyproject.toml
@@ -139,33 +238,51 @@ synapse-instant-document-insight/
 
 ---
 
-## 🧪 Development
+## Known Limitations
+
+- **File size:** Large files load into memory — no streaming upload yet
+- **Session expiry:** Sessions auto-delete after 24 hours
+- **No chat history:** Each query is independent, no multi-turn conversations
+- **Single similarity metric:** Cosine distance only (no hybrid search)
+- **Embedding model:** Fixed at 384 dimensions (multilingual-MiniLM-L12-v2)
+
+These are on the roadmap.
+
+---
+
+## Development
 
 ```bash
-pytest tests/ -v --cov=src    # Tests
+pytest tests/ -v --cov=src    # Run tests
 ruff check src/               # Lint
 mypy src/                     # Type check
 ```
 
 ---
 
-## 🔧 Configuration
+## Environment Variables
 
 ```env
-GROQ_API_KEY=gsk_your_key          # Required
-HUGGINGFACE_TOKEN=hf_your_token    # Optional
+# Required
+GROQ_API_KEY=gsk_your_key
+DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/db
+
+# Optional
+HUGGINGFACE_TOKEN=hf_xxx      # For private models
+LOG_LEVEL=info                # debug, info, warning, error
+PORT=8000
 ```
 
 ---
 
-## 📄 License
+## License
 
-MIT License - see [LICENSE](LICENSE)
+MIT — do whatever you want.
 
 ---
 
 <div align="center">
 
-**Built with ❤️ using FastAPI, LangChain & Docker**
+**Built with FastAPI, LangChain, PostgreSQL & Docker**
 
 </div>
