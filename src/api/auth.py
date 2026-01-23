@@ -2,14 +2,16 @@
 API key authentication
 """
 
-from src.db.models import APIKey
 import hashlib
 import secrets
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.db.models import APIKey
+
 
 def generate_api_key():
   """Generate a new API key"""
@@ -61,7 +63,7 @@ async def validate_api_key(
 
   stmt = select(APIKey).where(
     APIKey.key_hash == key_hash,
-    APIKey.is_active == True,
+    APIKey.is_active,
   )
 
   result = await db.execute(stmt)
@@ -72,7 +74,7 @@ async def validate_api_key(
     await db.execute(
       update(APIKey)
       .where(APIKey.id == api_key.id)
-      .values(last_used_at=datetime.now(timezone.utc))
+      .values(last_used_at=datetime.now(UTC))
     )
 
   return api_key

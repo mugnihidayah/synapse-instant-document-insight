@@ -2,7 +2,8 @@
 SQLAlchemy models for PostgreSQL + pgvector
 """
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
   Boolean,
@@ -15,6 +16,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+
 class Base(DeclarativeBase):
   """Base class for all models"""
   pass
@@ -34,7 +37,7 @@ class Session(Base):
   )
   expires_at: Mapped[datetime] = mapped_column(
     DateTime(timezone=True),
-    default=lambda: datetime.now(timezone.utc) + timedelta(hours=24),
+    default=lambda: datetime.now(UTC) + timedelta(hours=24),
   )
   document_count: Mapped[int] = mapped_column(
     Integer,

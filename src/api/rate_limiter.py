@@ -7,6 +7,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from starlette.requests import Request
 
+
 def get_api_key_or_ip(request: Request) -> str:
   """
   Get rate limit key from API key header, fallback to IP

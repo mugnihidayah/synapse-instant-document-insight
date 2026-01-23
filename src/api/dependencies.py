@@ -2,7 +2,6 @@
 FastAPI dependencies for authentication
 """
 
-from distro import name
 from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import APIKeyHeader
 from sqlalchemy.ext.asyncio import AsyncSession

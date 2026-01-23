@@ -5,7 +5,7 @@ Manages vectorstores per session to support multiple concurrent users
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -42,7 +42,7 @@ async def delete_session(db: AsyncSession, session_id: uuid.UUID) -> bool:
 
 async def cleanup_expired_sessions(db: AsyncSession) -> int:
   """Delete all expired sessions"""
-  now = datetime.now(timezone.utc)
+  now = datetime.now(UTC)
   stmt = select(Session).where(Session.expiry < now)
   result = await db.execute(stmt)
   expired = result.scalars().all()

@@ -2,12 +2,11 @@
 Structured logging using struclog
 """
 
-import structlog
-from aiohttp.web_routedef import get
 import logging
 import sys
 
 import structlog
+
 from src.core.config import settings
 
 

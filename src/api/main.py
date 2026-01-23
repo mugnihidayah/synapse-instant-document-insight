@@ -4,22 +4,19 @@ FastAPI application for synapse RAG
 This module creates nad configures the FastAPI application
 """
 import time
-
-from starlette.middleware.base import BaseHTTPMiddleware
-
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from starlette.middleware.base import BaseHTTPMiddleware
 
-from src.api.routes import documents_router, query_router, keys_router
-from src.core.config import settings
 from src.api.rate_limiter import limiter
-from src.core.logger import setup_logging, get_logger
+from src.api.routes import documents_router, keys_router, query_router
+from src.core.config import settings
+from src.core.logger import get_logger, setup_logging
 
 setup_logging()
 logger = get_logger(__name__)
