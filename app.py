@@ -40,7 +40,7 @@ def get_api_key():
 
     try:
         response = httpx.post(
-            f"{API_BASE_URL}/api/v1/keys/", json={"name": "streamlit-app"}, timeout=30.0
+            f"{API_BASE_URL}/api/v1/keys/", json={"name": "streamlit-app"}, timeout=60.0
         )
         if response.status_code == 200:
             data = response.json()
@@ -57,7 +57,7 @@ def create_session(api_key: str):
         response = httpx.post(
             f"{API_BASE_URL}/api/v1/documents/sessions",
             headers={"X-API-Key": api_key},
-            timeout=30.0,
+            timeout=60.0,
         )
         if response.status_code == 200:
             data = response.json()
