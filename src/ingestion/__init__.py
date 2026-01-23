@@ -14,11 +14,6 @@ from src.ingestion.loaders import (
     load_document_from_upload,
     load_documents_from_uploads,
 )
-from src.ingestion.vectorstore import (
-    create_persistent_vectorstore,
-    create_vectorstore,
-    get_embedding_function,
-)
 
 __all__: list[str] = [
     "load_document_from_path",

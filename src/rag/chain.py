@@ -7,7 +7,7 @@ Combines retrieval, reranking, and LLM for answering questions
 from collections.abc import Iterator
 from typing import Any
 
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
