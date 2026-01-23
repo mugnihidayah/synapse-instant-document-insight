@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   expires_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() + INTERVAL '24 hours',
   document_count INTEGER DEFAULT 0,
-  metadata JSONB DEFAULT '{}',
+  metadata JSONB DEFAULT '{}'
 );
 
 -- API Keys Table
