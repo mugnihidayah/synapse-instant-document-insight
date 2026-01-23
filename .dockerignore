@@ -44,3 +44,12 @@ Thumbs.db
 # Local data
 chroma_db/
 *.db
+
+opt/
+.mypy_cache/
+.ruff_cache/
+tests/
+.github/
+.devcontainer/
+*.md
+!README.md
