@@ -177,9 +177,9 @@ with st.sidebar:
     # Model Selector
     available_models = [
         "llama-3.3-70b-versatile",
-        "llama-3.1-8b-instant",
-        "mixtral-8x7b-32768",
-        "gemma2-9b-it",
+        "moonshotai/kimi-k2-instruct-0905",
+        "meta-llama/llama-4-scout-17b-16e-instruct",
+        "openai/gpt-oss-120b",
     ]
     selected_model = st.selectbox("AI Model:", available_models, index=0)
 
