@@ -47,7 +47,7 @@ async def delete_session(db: AsyncSession, session_id: uuid.UUID) -> bool:
 async def cleanup_expired_sessions(db: AsyncSession) -> int:
     """Delete all expired sessions"""
     now = datetime.now(UTC)
-    stmt = select(Session).where(Session.expiry < now)
+    stmt = select(Session).where(Session.expires_at < now)
     result = await db.execute(stmt)
     expired = result.scalars().all()
 
