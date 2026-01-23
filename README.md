@@ -5,6 +5,7 @@
 ### Instant Document Insights
 
 [![CI](https://github.com/mugnihidayah/synapse-instant-document-insight/workflows/CI/badge.svg)](https://github.com/mugnihidayah/synapse-instant-document-insight/actions)
+[![Deploy](https://img.shields.io/badge/Railway-Deployed-blueviolet?style=for-the-badge&logo=railway)](https://synapse-instant-document-insight-production.up.railway.app)
 [![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://postgresql.org)
@@ -15,6 +16,8 @@
 
 [Features](#-features) • [Quick Start](#-quick-start) • [API Docs](#-api-documentation) • [Docker](#-docker) • [Tech Stack](#-tech-stack)
 
+🚀 **Live Demo:** [synapse-instant-document-insight-production.up.railway.app](https://synapse-instant-document-insight-production.up.railway.app/docs)
+
 </div>
 
 ---
@@ -23,7 +26,7 @@
 
 | Feature                  | Description                                                      |
 | ------------------------ | ---------------------------------------------------------------- |
-| **Multi-format Support** | PDF, DOCX, TXT, more formats coming                             |
+| **Multi-format Support** | PDF, DOCX, TXT, more formats coming                              |
 | **REST API**             | FastAPI with auto-generated Swagger docs                         |
 | **Streaming**            | SSE streaming responses, ChatGPT-style                           |
 | **Bilingual**            | Responds in Indonesian or English based on your preference       |
@@ -99,7 +102,9 @@ uvicorn src.api.main:app --reload
 
 ## API Documentation
 
-**Base URL:** `http://localhost:8000/api/v1`
+**Base URL (Local):** `http://localhost:8000/api/v1`
+
+**Base URL (Production):** `https://synapse-instant-document-insight-production.up.railway.app/api/v1`
 
 ### Authentication
 
@@ -156,7 +161,9 @@ curl -X POST "localhost:8000/api/v1/query/$SESSION" \
   -d '{"question": "What was the revenue growth?", "language": "en"}'
 ```
 
-**Swagger UI:** http://localhost:8000/docs — try it interactively.
+**Swagger UI (Local):** http://localhost:8000/docs
+
+**Swagger UI (Production):** https://synapse-instant-document-insight-production.up.railway.app/docs
 
 ---
 
