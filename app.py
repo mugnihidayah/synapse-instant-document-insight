@@ -81,7 +81,7 @@ def upload_files(api_key: str, session_id: str, files):
             f"{API_BASE_URL}/api/v1/documents/upload/{session_id}",
             headers={"X-API-Key": api_key},
             files=file_data,
-            timeout=120.0,  # Longer timeout for file uploads
+            timeout=300.0,  # 5 minutes for large file uploads
         )
         if response.status_code == 200:
             return response.json()
