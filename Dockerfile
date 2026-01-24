@@ -1,7 +1,15 @@
 FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PORT=8000
+    PORT=8000 \
+    # Memory optimization
+    TOKENIZERS_PARALLELISM=false \
+    TRANSFORMERS_OFFLINE=0 \
+    HF_HOME=/tmp/hf_cache \
+    SENTENCE_TRANSFORMERS_HOME=/tmp/st_cache \
+    # Reduce memory from NumPy/BLAS
+    OMP_NUM_THREADS=1 \
+    MKL_NUM_THREADS=1
 WORKDIR /app
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
