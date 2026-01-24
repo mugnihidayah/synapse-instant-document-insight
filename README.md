@@ -247,13 +247,11 @@ synapse-instant-document-insight/
 
 ## Known Limitations
 
-- **File size:** Large files load into memory — no streaming upload yet
-- **Session expiry:** Sessions auto-delete after 24 hours
+- **File size:** Large files load into memory, no streaming upload yet
+- **Session expiry:** Sessions auto delete after 24 hours
 - **No chat history:** Each query is independent, no multi-turn conversations
 - **Single similarity metric:** Cosine distance only (no hybrid search)
 - **Embedding model:** Fixed at 384 dimensions (multilingual-MiniLM-L12-v2)
-
-These are on the roadmap.
 
 ---
 
