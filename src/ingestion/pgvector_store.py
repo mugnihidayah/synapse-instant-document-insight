@@ -40,46 +40,60 @@ async def store_documents(
     db: AsyncSession,
     session_id: uuid.UUID,
     documents: list[LangchainDocument],
+    batch_size: int = 50,
 ) -> int:
     """
-    Store documents with embeddings in PostgreSQL
+    Store documents with embeddings in PostgreSQL using batch processing.
+
+    Processes documents in batches to reduce memory usage for large files.
 
     Args:
       db: Database session
       session_id: Session ID
       documents: List of Langchain documents
+      batch_size: Number of documents to process at once (default: 50)
 
     Returns:
       Number of documents stored
     """
+    import gc
 
     try:
         embeddings = get_embeddings()
+        total_stored = 0
 
-        # get embeddings for all documents
-        texts = [doc.page_content for doc in documents]
-        vectors = embeddings.embed_documents(texts)
+        # Process in batches to reduce memory usage
+        for i in range(0, len(documents), batch_size):
+            batch = documents[i : i + batch_size]
 
-        # create document records
-        db_documents = []
-        for doc, vector in zip(documents, vectors, strict=True):
-            db_doc = Document(
-                session_id=session_id,
-                content=doc.page_content,
-                embedding=vector,
-                metadata=doc.metadata or {},
-            )
-            db_documents.append(db_doc)
+            # Get embeddings for this batch only
+            texts = [doc.page_content for doc in batch]
+            vectors = embeddings.embed_documents(texts)
 
-        db.add_all(db_documents)
-        await db.flush()
+            # Create document records for this batch
+            db_documents = []
+            for doc, vector in zip(batch, vectors, strict=True):
+                db_doc = Document(
+                    session_id=session_id,
+                    content=doc.page_content,
+                    embedding=vector,
+                    metadata=doc.metadata or {},
+                )
+                db_documents.append(db_doc)
 
-        # update session document count
+            db.add_all(db_documents)
+            await db.flush()
+            total_stored += len(db_documents)
+
+            # Free memory after each batch
+            gc.collect()
+
+        # Update session document count
         session = await db.get(Session, session_id)
         if session:
-            session.document_count += len(db_documents)
+            session.document_count += total_stored
 
-        return len(db_documents)
+        return total_stored
 
     except Exception as e:
         raise VectorStoreError(
@@ -98,13 +112,13 @@ async def similarity_search(
     Find similar documents using pgvector cosine similarity
 
     Args:
-      db: Database session
-      session_id: Session ID
-      query: Query text
-      k: Number of results to return
+        db: Database session
+        session_id: Session ID
+        query: Query text
+        k: Number of results to return
 
     Returns:
-      List of similar Langchain documents
+        List of similar Langchain documents
     """
 
     try:
@@ -115,12 +129,12 @@ async def similarity_search(
 
         stmt = text(
             """
-      SELECT id, content, metadata, embedding <=> :query_vector AS distance
-      FROM documents
-      WHERE session_id = :session_id
-      ORDER BY embedding <=> :query_vector
-      LIMIT :k
-    """
+            SELECT id, content, metadata, embedding <=> :query_vector AS distance
+            FROM documents
+            WHERE session_id = :session_id
+            ORDER BY embedding <=> :query_vector
+            LIMIT :k
+            """
         )
 
         result = await db.execute(
@@ -164,11 +178,11 @@ async def delete_session_documents(
     Delete all documents for a session
 
     Args:
-      db: Database session
-      session_id: Session ID
+        db: Database session
+        session_id: Session ID
 
     Returns:
-      Number of documents deleted
+        Number of documents deleted
     """
 
     try:
