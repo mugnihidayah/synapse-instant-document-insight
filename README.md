@@ -16,7 +16,7 @@
 
 [Features](#-features) • [Quick Start](#-quick-start) • [API Docs](#-api-documentation) • [Docker](#-docker) • [Tech Stack](#-tech-stack)
 
-🚀 **Live Demo:** [synapse-instant-document-insight-production.up.railway.app](https://synapse-instant-document-insight-production.up.railway.app/docs)
+🚀 **API Docs:** [synapse-instant-document-insight-production.up.railway.app](https://synapse-instant-document-insight-production.up.railway.app/docs)
 
 </div>
 
