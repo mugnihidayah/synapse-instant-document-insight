@@ -60,19 +60,30 @@ async def query_stream(
             detail="No documents in session. Upload documents first.",
         )
 
+    # Get chat history
+    chat_messages = await get_chat_history(db, session.id, limit=5)
+    chat_history_str = format_chat_history(chat_messages)
+
+    # Contextualize query
+    contextualized_question = await contextualize_query(
+        query_request.question,
+        chat_history_str,
+        query_request.model,
+    )
+
     try:
         # Get relevant documents
         docs = await similarity_search(
             db,
             session.id,
-            query_request.question,
+            contextualized_question,
             k=settings.retrieval_top_k,
         )
 
         # Rerank documents
         reranker = get_reranker()
         docs = await reranker.rerank(
-            query_request.question,
+            contextualized_question,
             docs,
             top_k=settings.rerank_top_k,
         )
@@ -95,19 +106,22 @@ async def query_stream(
                 temperature=query_request.temperature,
             )
 
-            # prompt = get_prompt(query_request.language)
-
             # Stream response
             full_response = ""
             async for chunk in chain.astream(
                 {
                     "context": context,
                     "question": query_request.question,
-                    "chat_history": "",
+                    "chat_history": chat_history_str,
                 }
             ):
                 full_response += chunk
                 yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+
+            # Save chat messages after streaming completes
+            await save_chat_message(db, session.id, "user", query_request.question)
+            await save_chat_message(db, session.id, "assistant", full_response)
+            await db.commit()
 
             # Send sources
             yield f"data: {json.dumps({'sources': sources})}\n\n"
@@ -143,7 +157,7 @@ async def query(
     session = await session_service.get_session_by_str(db, session_id)
 
     # Get chat history
-    chat_messages = await get_chat_history(db, session_id, limit=5)
+    chat_messages = await get_chat_history(db, session.id, limit=5)
     chat_history_str = format_chat_history(chat_messages)
 
     # Contextualize query
@@ -210,10 +224,10 @@ async def query(
         )
 
         # save user message
-        await save_chat_message(db, session_id, "user", query_request.question)
+        await save_chat_message(db, session.id, "user", query_request.question)
 
         # save assistant response
-        await save_chat_message(db, session_id, "assistant", response)
+        await save_chat_message(db, session.id, "assistant", response)
 
         await db.commit()
 

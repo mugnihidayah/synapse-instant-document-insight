@@ -4,7 +4,6 @@ Query contextualization for multi-turn conversations.
 Transform ambiguous queries like "Explain in more detail" into comprehensive queries based on chat history.
 """
 
-from torch.ao.quantization import QuantWrapper
 from langchain_groq import ChatGroq
 
 from src.core.config import settings
