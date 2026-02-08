@@ -5,8 +5,10 @@ Tests for RAG module
 from unittest.mock import MagicMock, patch
 
 import pytest
+from langchain_core.documents import Document
 
 from src.core.exceptions import RAGError
+from src.rag.chain import ask_question
 from src.rag.prompts import PROMPT_EN, PROMPT_ID, get_prompt
 
 
@@ -78,31 +80,53 @@ class TestReranker:
         r1 = get_reranker()
         r2 = get_reranker()
 
-        # Should be same instance due to lru_cache
+        # Should be same instance due to caching
         assert r1 is r2
 
-    def test_rerank_documents_empty_list(self) -> None:
+    @pytest.mark.asyncio
+    async def test_rerank_empty_list(self) -> None:
         """Test reranking empty list returns empty list."""
-        from src.rag.reranker import rerank_documents
+        from src.rag.reranker import get_reranker
 
-        result = rerank_documents("query", [])
+        reranker = get_reranker()
+        result = await reranker.rerank("query", [])
         assert result == []
 
+    @pytest.mark.asyncio
     @pytest.mark.slow
-    def test_rerank_documents_returns_sorted(self, mock_rerank_passages: list[dict]) -> None:
+    async def test_rerank_returns_documents(self) -> None:
         """Test that reranking returns documents."""
-        from src.rag.reranker import rerank_documents
+        from langchain_core.documents import Document
 
-        result = rerank_documents("Python programming", mock_rerank_passages, top_k=2)
+        from src.rag.reranker import get_reranker
+
+        docs = [
+            Document(page_content="Python is a programming language.", metadata={"id": "1"}),
+            Document(page_content="Java is also a programming language.", metadata={"id": "2"}),
+            Document(page_content="The weather is nice today.", metadata={"id": "3"}),
+        ]
+
+        reranker = get_reranker()
+        result = await reranker.rerank("Python programming", docs, top_k=2)
 
         assert len(result) <= 2
         assert isinstance(result, list)
 
-    def test_rerank_documents_respects_top_k(self, mock_rerank_passages: list[dict]) -> None:
+    @pytest.mark.asyncio
+    async def test_rerank_respects_top_k(self) -> None:
         """Test that top_k limits results."""
-        from src.rag.reranker import rerank_documents
+        from langchain_core.documents import Document
 
-        result = rerank_documents("Python", mock_rerank_passages, top_k=1)
+        from src.rag.reranker import get_reranker
+
+        docs = [
+            Document(page_content="Doc 1", metadata={"id": "1"}),
+            Document(page_content="Doc 2", metadata={"id": "2"}),
+            Document(page_content="Doc 3", metadata={"id": "3"}),
+        ]
+
+        reranker = get_reranker()
+        result = await reranker.rerank("query", docs, top_k=1)
 
         assert len(result) <= 1
 
@@ -175,8 +199,6 @@ class TestAskQuestion:
     @pytest.mark.skip(reason="Complex mocking required - tested via integration")
     def test_ask_question_with_mock_vectorstore(self, mock_chat_messages: list[dict]) -> None:
         """Test ask_question with mocked vectorstore."""
-        from src.rag.chain import ask_question
-        from langchain_core.documents import Document
 
         # Create mock vectorstore
         mock_vectorstore = MagicMock()
