@@ -15,7 +15,7 @@ from pydantic import SecretStr
 from src.core.config import settings
 from src.core.exceptions import RAGError
 from src.rag.prompts import get_prompt
-from src.rag.reranker import rerank_documents
+from src.rag.reranker import get_reranker
 
 
 def format_chat_history(messages: list[dict]) -> str:
@@ -97,21 +97,15 @@ def ask_question(
     if not initial_docs:
         raise RAGError("No relevant documents found", details={"question": question})
 
-    # prepare for reranking
-    passages = [
-        {"id": str(i), "text": doc.page_content, "meta": doc.metadata}
-        for i, doc in enumerate(initial_docs)
-    ]
-
     # rerank documents
-    top_results = rerank_documents(question, passages)
+    top_results = get_reranker().rerank(question, initial_docs)
 
     # format context and history
-    context_text = "\n\n".join([res["text"] for res in top_results])
+    context_text = "\n\n".join([res.page_content for res in top_results])
     history_text = format_chat_history(messages[:-1])  # exclude current message
 
     # prepare source for return
-    sources = [{"metadata": res["meta"], "page_content": res["text"]} for res in top_results]
+    sources = [{"metadata": res.metadata, "page_content": res.page_content} for res in top_results]
 
     # build chain
     template = get_prompt(language)

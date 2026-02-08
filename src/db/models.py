@@ -53,10 +53,15 @@ class Session(Base):
         default=dict,
     )
 
-    # Relationship - MUST be after Document class is defined
+    # Relationship
     documents: Mapped[list["Document"]] = relationship(
         back_populates="session",
         cascade="all, delete-orphan",
+    )
+    chat_messages: Mapped[list["ChatMessage"]] = relationship(
+        back_populates="session",
+        cascade="all, delete-orphan",
+        order_by="ChatMessage.created_at",
     )
 
 
@@ -133,4 +138,38 @@ class Document(Base):
     # Relationship back to Session
     session: Mapped["Session"] = relationship(
         back_populates="documents",
+    )
+
+
+class ChatMessage(Base):
+    """Chat history message"""
+
+    __tablename__ = "chat_history"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("sessions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    role: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+    )
+    content: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+    # relationship
+    session: Mapped["Session"] = relationship(
+        back_populates="chat_messages",
     )
