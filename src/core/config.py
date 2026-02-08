@@ -125,6 +125,13 @@ class Settings(BaseSettings):
         description="Log level (debug, info, warning, error)",
     )
 
+    reranker_provider: str = Field(
+        default="cohere",
+        description="Reranker provider (cohere, local, or none)",
+    )
+
+    cohere_api_key: str = Field(default="", description="Cohere API key for reranker")
+
     @field_validator("groq_api_key", "huggingface_token")
     @classmethod
     def check_not_placeholder(cls, v: str, info) -> str:
@@ -164,7 +171,7 @@ def get_settings() -> Settings:
     Use lru_cache to ensure settings are only loaded once
 
     Returns:
-      Settings: The application settings instance
+        Settings: The application settings instance
     """
     settings = Settings()
     settings.setup_environment()

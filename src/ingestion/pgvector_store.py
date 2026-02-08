@@ -48,13 +48,13 @@ async def store_documents(
     Processes documents in batches to reduce memory usage for large files.
 
     Args:
-      db: Database session
-      session_id: Session ID
-      documents: List of Langchain documents
-      batch_size: Number of documents to process at once (default: 50)
+        db: Database session
+        session_id: Session ID
+        documents: List of Langchain documents
+        batch_size: Number of documents to process at once (default: 50)
 
     Returns:
-      Number of documents stored
+        Number of documents stored
     """
     import gc
 

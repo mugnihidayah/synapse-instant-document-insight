@@ -20,6 +20,13 @@ from src.db import get_db
 from src.db.models import APIKey
 from src.ingestion.pgvector_store import similarity_search
 from src.rag.chain import create_rag_chain
+from src.rag.chat_history import (
+    format_chat_history,
+    get_chat_history,
+    save_chat_message,
+)
+from src.rag.contextualize import contextualize_query
+from src.rag.reranker import get_reranker
 
 logger = get_logger(__name__)
 
@@ -60,6 +67,14 @@ async def query_stream(
             session.id,
             query_request.question,
             k=settings.retrieval_top_k,
+        )
+
+        # Rerank documents
+        reranker = get_reranker()
+        docs = await reranker.rerank(
+            query_request.question,
+            docs,
+            top_k=settings.rerank_top_k,
         )
 
         # Format context
@@ -127,6 +142,17 @@ async def query(
     # Validate session
     session = await session_service.get_session_by_str(db, session_id)
 
+    # Get chat history
+    chat_messages = await get_chat_history(db, session_id, limit=5)
+    chat_history_str = format_chat_history(chat_messages)
+
+    # Contextualize query
+    contextualized_question = await contextualize_query(
+        query_request.question,
+        chat_history_str,
+        query_request.model
+    )
+
     if not session:
         logger.warning("query_failed", reason="session_not_found", session_id=session_id)
         raise HTTPException(
@@ -146,8 +172,16 @@ async def query(
         docs = await similarity_search(
             db,
             session.id,
-            query_request.question,
+            contextualized_question,
             k=settings.retrieval_top_k,
+        )
+
+        # rerank documents
+        reranker = get_reranker()
+        docs = await reranker.rerank(
+            query_request.question,
+            docs,
+            top_k=settings.rerank_top_k,
         )
 
         context = "\n\n".join([doc.page_content for doc in docs])
@@ -174,6 +208,14 @@ async def query(
             session_id=session_id,
             sources_count=len(sources),
         )
+
+        # save user message
+        await save_chat_message(db, session_id, "user", query_request.question)
+
+        # save assistant response
+        await save_chat_message(db, session_id, "assistant", response)
+
+        await db.commit()
 
         return QueryResponse(
             answer=response,
