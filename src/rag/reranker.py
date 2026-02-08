@@ -6,8 +6,6 @@ Supports:
 - Local Cross-encoder
 """
 
-from pydantic_settings import SettingsConfigDict
-from transformers.models.yoso.modeling_yoso import lsh_cumulation
 from abc import ABC, abstractmethod
 
 from langchain_core.documents import Document
