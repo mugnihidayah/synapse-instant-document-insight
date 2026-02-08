@@ -162,9 +162,7 @@ async def query(
 
     # Contextualize query
     contextualized_question = await contextualize_query(
-        query_request.question,
-        chat_history_str,
-        query_request.model
+        query_request.question, chat_history_str, query_request.model
     )
 
     if not session:
