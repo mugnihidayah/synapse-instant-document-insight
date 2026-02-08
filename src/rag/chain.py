@@ -105,10 +105,7 @@ async def ask_question(
     history_text = format_chat_history(messages[:-1])  # exclude current message
 
     # prepare source for return
-    sources = [
-        {"metadata": res.metadata, "page_content": res.page_content}
-        for res in top_results
-    ]
+    sources = [{"metadata": res.metadata, "page_content": res.page_content} for res in top_results]
 
     # build chain
     template = get_prompt(language)
