@@ -48,7 +48,7 @@ def format_documents(docs: list) -> str:
     return "\n\n".join([d.page_content for d in docs])
 
 
-def ask_question(
+async def ask_question(
     question: str,
     messages: list[dict],
     vectorstore,
@@ -98,14 +98,17 @@ def ask_question(
         raise RAGError("No relevant documents found", details={"question": question})
 
     # rerank documents
-    top_results = get_reranker().rerank(question, initial_docs)
+    top_results = await get_reranker().rerank(question, initial_docs)
 
     # format context and history
     context_text = "\n\n".join([res.page_content for res in top_results])
     history_text = format_chat_history(messages[:-1])  # exclude current message
 
     # prepare source for return
-    sources = [{"metadata": res.metadata, "page_content": res.page_content} for res in top_results]
+    sources = [
+        {"metadata": res.metadata, "page_content": res.page_content}
+        for res in top_results
+    ]
 
     # build chain
     template = get_prompt(language)

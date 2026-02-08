@@ -4,13 +4,15 @@ Structured logging using struclog
 
 import logging
 import sys
+from typing import cast
 
 import structlog
+from structlog.stdlib import BoundLogger
 
 from src.core.config import settings
 
 
-def setup_logging():
+def setup_logging() -> None:
     """Configure structured logging"""
 
     # Set log level
@@ -38,6 +40,6 @@ def setup_logging():
     )
 
 
-def get_logger(name: str = __name__) -> structlog.BoundLogger:
+def get_logger(name: str = __name__) -> BoundLogger:
     """Get a logger instance"""
-    return structlog.get_logger(name)
+    return cast(BoundLogger, structlog.get_logger(name))
