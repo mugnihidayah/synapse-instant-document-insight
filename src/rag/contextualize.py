@@ -51,13 +51,18 @@ async def contextualize_query(
     try:
         llm = ChatGroq(model=model_name or settings.llm_model, temperature=0)
 
-        prompt = CONTEXTUALIZE_PROMPT.format(chat_history=chat_history, question=question)
+        prompt = CONTEXTUALIZE_PROMPT.format(
+            chat_history=chat_history, question=question
+        )
 
         response = await llm.ainvoke(prompt)
-        contextualized = response.content.strip()
+        content = response.content
+        contextualized = content.strip() if isinstance(content, str) else str(content)
 
         logger.info(
-            "query_contextualized", original=question[:50], contextualized=contextualized[:50]
+            "query_contextualized",
+            original=question[:50],
+            contextualized=contextualized[:50],
         )
 
         return contextualized

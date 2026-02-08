@@ -153,20 +153,13 @@ async def query(
         question=query_request.question[:50],
     )
 
-    # Validate session
+    # Validate session first
     session = await session_service.get_session_by_str(db, session_id)
 
-    # Get chat history
-    chat_messages = await get_chat_history(db, session.id, limit=5)
-    chat_history_str = format_chat_history(chat_messages)
-
-    # Contextualize query
-    contextualized_question = await contextualize_query(
-        query_request.question, chat_history_str, query_request.model
-    )
-
     if not session:
-        logger.warning("query_failed", reason="session_not_found", session_id=session_id)
+        logger.warning(
+            "query_failed", reason="session_not_found", session_id=session_id
+        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Session {session_id} not found",
@@ -178,6 +171,15 @@ async def query(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No documents in session",
         )
+
+    # Get chat history (safe to access session.id now)
+    chat_messages = await get_chat_history(db, session.id, limit=5)
+    chat_history_str = format_chat_history(chat_messages)
+
+    # Contextualize query
+    contextualized_question = await contextualize_query(
+        query_request.question, chat_history_str, query_request.model
+    )
 
     try:
         # Get relevant documents
