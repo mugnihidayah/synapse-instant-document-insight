@@ -101,9 +101,7 @@ class TestReranker:
         from src.rag.reranker import get_reranker
 
         docs = [
-            Document(
-                page_content="Python is a programming language.", metadata={"id": "1"}
-            ),
+            Document(page_content="Python is a programming language.", metadata={"id": "1"}),
             Document(
                 page_content="Java is also a programming language.",
                 metadata={"id": "2"},
@@ -156,9 +154,7 @@ class TestChainHelpers:
         assert "User:" in result
         assert "Hello" in result
 
-    def test_format_chat_history_multiple_messages(
-        self, mock_chat_messages: list[dict]
-    ) -> None:
+    def test_format_chat_history_multiple_messages(self, mock_chat_messages: list[dict]) -> None:
         """Test formatting multiple messages."""
         from src.rag.chain import format_chat_history
 
@@ -191,9 +187,7 @@ class TestAskQuestion:
     """Tests for ask_question function."""
 
     @pytest.mark.asyncio
-    async def test_ask_question_no_vectorstore_raises(
-        self, mock_chat_messages: list[dict]
-    ) -> None:
+    async def test_ask_question_no_vectorstore_raises(self, mock_chat_messages: list[dict]) -> None:
         """Test that None vectorstore raises RAGError."""
         from src.rag.chain import ask_question
 
@@ -207,9 +201,7 @@ class TestAskQuestion:
         assert "vectorstore" in str(exc_info.value).lower()
 
     @pytest.mark.skip(reason="Complex mocking required - tested via integration")
-    def test_ask_question_with_mock_vectorstore(
-        self, mock_chat_messages: list[dict]
-    ) -> None:
+    def test_ask_question_with_mock_vectorstore(self, mock_chat_messages: list[dict]) -> None:
         """Test ask_question with mocked vectorstore."""
 
         # Create mock vectorstore

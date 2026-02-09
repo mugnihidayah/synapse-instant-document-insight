@@ -1,1 +1,1 @@
-""" Test package for synapse RAG system"""
+"""Test package for synapse RAG system"""

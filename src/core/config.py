@@ -132,6 +132,19 @@ class Settings(BaseSettings):
 
     cohere_api_key: str = Field(default="", description="Cohere API key for reranker")
 
+    # hybrid search
+    use_hybrid_search: bool = Field(
+        default=True, description="Use hybrid search (vector + keyword)"
+    )
+    hybrid_vector_weight: float = Field(
+        default=0.5,
+        description="Weight for vector search in hybrid search (0-1)",
+    )
+    hybrid_keyword_weight: float = Field(
+        default=0.5,
+        description="Weight for keyword search in hybrid search (0-1)",
+    )
+
     @field_validator("groq_api_key", "huggingface_token")
     @classmethod
     def check_not_placeholder(cls, v: str, info) -> str:

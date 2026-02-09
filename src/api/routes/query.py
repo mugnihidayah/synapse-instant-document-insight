@@ -26,6 +26,7 @@ from src.rag.chat_history import (
     save_chat_message,
 )
 from src.rag.contextualize import contextualize_query
+from src.rag.hybrid_search import hybrid_search
 from src.rag.reranker import get_reranker
 
 logger = get_logger(__name__)
@@ -73,12 +74,22 @@ async def query_stream(
 
     try:
         # Get relevant documents
-        docs = await similarity_search(
-            db,
-            session.id,
-            contextualized_question,
-            k=settings.retrieval_top_k,
-        )
+        if settings.use_hybrid_search:
+            docs = await hybrid_search(
+                db,
+                session.id,
+                contextualized_question,
+                k=settings.retrieval_top_k,
+                vector_weight=settings.hybrid_vector_weight,
+                keyword_weight=settings.hybrid_keyword_weight,
+            )
+        else:
+            docs = await similarity_search(
+                db,
+                session.id,
+                contextualized_question,
+                k=settings.retrieval_top_k,
+            )
 
         # Rerank documents
         reranker = get_reranker()
@@ -181,12 +192,22 @@ async def query(
 
     try:
         # Get relevant documents
-        docs = await similarity_search(
-            db,
-            session.id,
-            contextualized_question,
-            k=settings.retrieval_top_k,
-        )
+        if settings.use_hybrid_search:
+            docs = await hybrid_search(
+                db,
+                session.id,
+                contextualized_question,
+                k=settings.retrieval_top_k,
+                vector_weight=settings.hybrid_vector_weight,
+                keyword_weight=settings.hybrid_keyword_weight,
+            )
+        else:
+            docs = await similarity_search(
+                db,
+                session.id,
+                contextualized_question,
+                k=settings.retrieval_top_k,
+            )
 
         # rerank documents
         reranker = get_reranker()

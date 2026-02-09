@@ -41,6 +41,12 @@ CREATE TABLE IF NOT EXISTS chat_history (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Add full-text search column (update table documents)
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS content_tsv tsvector GENERATED ALWAYS AS (to_tsvector('english', content)) STORED;
+
+-- Create GIN index for full text search
+CREATE INDEX IF NOT EXISTS documents_content_tsv_idx ON documents USING GIN(content_tsv);
+
 -- Index for fast similarity search
 CREATE INDEX IF NOT EXISTS documents_embedding_idx ON documents(session_id);
 CREATE INDEX IF NOT EXISTS sessions_expires_idx ON sessions(expires_at);
