@@ -48,11 +48,14 @@ async def query_stream(
 
     # Validate session
     session = await session_service.get_session_by_str(db, session_id)
-
     if not session:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Session {session_id} not found",
+        )
+    if session.api_key_id != api_key.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="You do not have access to this session"
         )
 
     if session.document_count == 0:
@@ -166,12 +169,16 @@ async def query(
 
     # Validate session first
     session = await session_service.get_session_by_str(db, session_id)
-
     if not session:
         logger.warning("query_failed", reason="session_not_found", session_id=session_id)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Session {session_id} not found",
+        )
+
+    if session.api_key_id != api_key.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="You do not have access to this session"
         )
 
     if session.document_count == 0:
@@ -230,7 +237,7 @@ async def query(
             {
                 "context": context,
                 "question": query_request.question,
-                "chat_history": "",
+                "chat_history": chat_history_str,
             }
         )
 

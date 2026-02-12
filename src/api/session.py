@@ -13,9 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.db.models import Session
 
 
-async def create_session(db: AsyncSession) -> Session:
+async def create_session(db: AsyncSession, api_key_id: uuid.UUID) -> Session:
     """Create a new session in database"""
-    session = Session()
+    session = Session(api_key_id=api_key_id)
     db.add(session)
     await db.flush()
     return session
@@ -56,3 +56,13 @@ async def cleanup_expired_sessions(db: AsyncSession) -> int:
         await db.delete(session)
 
     return count
+
+
+async def get_session_for_key(
+    db: AsyncSession, session_id: uuid.UUID, api_key_id: uuid.UUID
+) -> Session | None:
+    """Get session for a specific API key"""
+    session = await get_session(db, session_id)
+    if session and session.api_key_id == api_key_id:
+        return session
+    return None

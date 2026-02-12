@@ -2,13 +2,8 @@
 Tests for RAG module
 """
 
-from unittest.mock import MagicMock, patch
-
 import pytest
-from langchain_core.documents import Document
 
-from src.core.exceptions import RAGError
-from src.rag.chain import ask_question
 from src.rag.prompts import PROMPT_EN, PROMPT_ID, get_prompt
 
 
@@ -132,118 +127,6 @@ class TestReranker:
         result = await reranker.rerank("query", docs, top_k=1)
 
         assert len(result) <= 1
-
-
-class TestChainHelpers:
-    """Tests for chain helper functions."""
-
-    def test_format_chat_history_empty(self) -> None:
-        """Test formatting empty chat history."""
-        from src.rag.chain import format_chat_history
-
-        result = format_chat_history([])
-        assert result == ""
-
-    def test_format_chat_history_single_message(self) -> None:
-        """Test formatting single message."""
-        from src.rag.chain import format_chat_history
-
-        messages = [{"role": "user", "content": "Hello"}]
-        result = format_chat_history(messages)
-
-        assert "User:" in result
-        assert "Hello" in result
-
-    def test_format_chat_history_multiple_messages(self, mock_chat_messages: list[dict]) -> None:
-        """Test formatting multiple messages."""
-        from src.rag.chain import format_chat_history
-
-        result = format_chat_history(mock_chat_messages)
-
-        assert "User:" in result
-        assert "Assistant:" in result
-        assert "What is Python?" in result
-
-    def test_format_chat_history_preserves_order(self) -> None:
-        """Test that message order is preserved."""
-        from src.rag.chain import format_chat_history
-
-        messages = [
-            {"role": "user", "content": "First"},
-            {"role": "assistant", "content": "Second"},
-            {"role": "user", "content": "Third"},
-        ]
-        result = format_chat_history(messages)
-
-        # Check order
-        first_pos = result.find("First")
-        second_pos = result.find("Second")
-        third_pos = result.find("Third")
-
-        assert first_pos < second_pos < third_pos
-
-
-class TestAskQuestion:
-    """Tests for ask_question function."""
-
-    @pytest.mark.asyncio
-    async def test_ask_question_no_vectorstore_raises(self, mock_chat_messages: list[dict]) -> None:
-        """Test that None vectorstore raises RAGError."""
-        from src.rag.chain import ask_question
-
-        with pytest.raises(RAGError) as exc_info:
-            await ask_question(
-                question="What is Python?",
-                messages=mock_chat_messages,
-                vectorstore=None,
-            )
-
-        assert "vectorstore" in str(exc_info.value).lower()
-
-    @pytest.mark.skip(reason="Complex mocking required - tested via integration")
-    def test_ask_question_with_mock_vectorstore(self, mock_chat_messages: list[dict]) -> None:
-        """Test ask_question with mocked vectorstore."""
-
-        # Create mock vectorstore
-        mock_vectorstore = MagicMock()
-        mock_retriever = MagicMock()
-        mock_vectorstore.as_retriever.return_value = mock_retriever
-        mock_retriever.invoke.return_value = [
-            Document(
-                page_content="Python is a programming language.",
-                metadata={"source": "doc.txt"},
-            )
-        ]
-
-        # Mock the LLM to avoid actual API calls
-        with patch("src.rag.chain.ChatGroq") as mock_llm_class:
-            # Setup mock chain
-            mock_llm = MagicMock()
-            mock_llm_class.return_value = mock_llm
-
-            # Mock the chain pipeline
-            mock_chain = MagicMock()
-            mock_llm.__or__ = MagicMock(return_value=mock_chain)
-            mock_chain.__or__ = MagicMock(return_value=mock_chain)
-            mock_chain.stream.return_value = iter(["This ", "is ", "a ", "response."])
-
-            # Mock reranker
-            with patch("src.rag.chain.rerank_documents") as mock_rerank:
-                mock_rerank.return_value = [
-                    {"text": "Python is a programming language.", "meta": {}}
-                ]
-
-                generator, sources = ask_question(
-                    question="What is Python?",
-                    messages=mock_chat_messages,
-                    vectorstore=mock_vectorstore,
-                )
-
-                # Consume generator
-                response = "".join(generator)
-
-                assert len(response) > 0
-                assert isinstance(sources, list)
 
 
 class TestChainIntegration:

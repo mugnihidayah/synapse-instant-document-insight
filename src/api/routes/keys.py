@@ -6,8 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.auth import create_api_key, list_api_keys, revoke_api_key
+from src.api.auth import create_api_key, revoke_api_key
+from src.api.dependencies import get_api_key
 from src.db import get_db
+from src.db.models import APIKey
 
 router = APIRouter(prefix="/keys", tags=["API Keys"])
 
@@ -61,20 +63,19 @@ async def create_key(
 @router.get("/", response_model=list[KeyInfo])
 async def get_keys(
     db: AsyncSession = Depends(get_db),
+    api_key: APIKey = Depends(get_api_key),
 ) -> list[KeyInfo]:
     """List all API keys"""
-    keys = await list_api_keys(db)
 
     return [
         KeyInfo(
-            key_id=str(k.id),
-            name=k.name,
-            rate_limit=k.rate_limit,
-            is_active=k.is_active,
-            created_at=k.created_at.isoformat(),
-            last_used_at=k.last_used_at.isoformat() if k.last_used_at else None,
+            key_id=str(api_key.id),
+            name=api_key.name,
+            rate_limit=api_key.rate_limit,
+            is_active=api_key.is_active,
+            created_at=api_key.created_at.isoformat(),
+            last_used_at=api_key.last_used_at.isoformat() if api_key.last_used_at else None,
         )
-        for k in keys
     ]
 
 
@@ -82,6 +83,7 @@ async def get_keys(
 async def delete_key(
     key_id: str,
     db: AsyncSession = Depends(get_db),
+    api_key: APIKey = Depends(get_api_key),
 ) -> dict:
     """Revoke an API key"""
     import uuid
@@ -93,6 +95,12 @@ async def delete_key(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid key ID format",
         ) from None
+
+    if uid != api_key.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to revoke this API key",
+        )
 
     revoked = await revoke_api_key(db, uid)
 

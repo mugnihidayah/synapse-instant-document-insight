@@ -37,8 +37,8 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     Dependency for FastAPI to get database session
 
     Usage:
-      @app.get("/items")
-      async def get_items(db: AsyncSession = Depends(get_db)):
+        @app.get("/items")
+        async def get_items(db: AsyncSession = Depends(get_db)):
     """
     async with async_session_maker() as session:
         try:
@@ -57,7 +57,7 @@ async def get_db_context() -> AsyncGenerator[AsyncSession, None]:
     context manager for database session (for non FastAPI usage)
 
     Usage:
-      async with get_db_context() as session:
+        async with get_db_context() as session:
         result = await db.execute(query)
     """
     async with async_session_maker() as session:

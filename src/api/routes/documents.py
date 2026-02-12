@@ -42,7 +42,7 @@ async def create_session(
     api_key: APIKey = Depends(get_api_key),
 ) -> SessionCreate:
     logger.info("session_create_started")
-    session = await session_service.create_session(db)
+    session = await session_service.create_session(db, api_key_id=api_key.id)
     logger.info("session_created", session_id=str(session.id))
     return SessionCreate(session_id=str(session.id))
 
@@ -57,6 +57,10 @@ async def get_session_info(
 ) -> SessionInfo:
     """Get session information"""
     session = await session_service.get_session_by_str(db, session_id)
+    if session and session.api_key_id != api_key.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="You do not have access to this session"
+        )
 
     if not session:
         raise HTTPException(
@@ -89,6 +93,12 @@ async def delete_session(
             detail="Invalid session ID format",
         ) from None
 
+    session = await session_service.get_session_for_key(db, uid, api_key.id)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Session {session_id} not found"
+        )
+
     deleted = await session_service.delete_session(db, uid)
 
     if not deleted:
@@ -120,11 +130,15 @@ async def upload_documents(
 
     # Validate session
     session = await session_service.get_session_by_str(db, session_id)
-
     if not session:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Session {session_id} not found. Create a session first.",
+        )
+
+    if session.api_key_id != api_key.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="You do not have access to this session"
         )
 
     # Validate files

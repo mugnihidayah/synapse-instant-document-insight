@@ -4,6 +4,7 @@ FastAPI application for synapse RAG
 This module creates nad configures the FastAPI application
 """
 
+import asyncio
 import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -16,8 +17,10 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.api.rate_limiter import limiter
 from src.api.routes import documents_router, keys_router, query_router
+from src.api.session import cleanup_expired_sessions
 from src.core.config import settings
 from src.core.logger import get_logger, setup_logging
+from src.db.connection import get_db_context
 
 setup_logging()
 logger = get_logger(__name__)
@@ -35,10 +38,29 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     print("starting Synapse RAG API...")
     settings.setup_environment()
 
+    cleanup_task = asyncio.create_task(periodic_cleanup())
+
     yield
+
+    cleanup_task.cancel()
 
     # shutdown
     print("shutting down Synapse RAG API...")
+
+
+async def periodic_cleanup():
+    """Periodically cleanup expired sessions"""
+    while True:
+        try:
+            await asyncio.sleep(3600)
+            async with get_db_context() as db:
+                count = await cleanup_expired_sessions(db)
+                if count > 0:
+                    logger.info("expired_sessions_cleaned", count=count)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error("cleanup_failed", error=str(e))
 
 
 def create_app() -> FastAPI:

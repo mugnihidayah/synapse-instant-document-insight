@@ -41,6 +41,9 @@ CREATE TABLE IF NOT EXISTS chat_history (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Add api_key_id to sessions table
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS api_key_id UUID REFERENCES api_keys(id) ON DELETE CASCADE;
+
 -- Add full-text search column (update table documents)
 ALTER TABLE documents ADD COLUMN IF NOT EXISTS content_tsv tsvector GENERATED ALWAYS AS (to_tsvector('english', content)) STORED;
 
@@ -51,3 +54,8 @@ CREATE INDEX IF NOT EXISTS documents_content_tsv_idx ON documents USING GIN(cont
 CREATE INDEX IF NOT EXISTS documents_embedding_idx ON documents(session_id);
 CREATE INDEX IF NOT EXISTS sessions_expires_idx ON sessions(expires_at);
 CREATE INDEX IF NOT EXISTS chat_history_session_idx ON chat_history(session_id, created_at);
+
+-- HNSW index for fast approximate nearest neighbor search
+CREATE INDEX IF NOT EXISTS documents_embedding_hnsw_idx 
+  ON documents USING hnsw (embedding vector_cosine_ops)
+  WITH (m = 16, ef_construction = 64);
