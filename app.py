@@ -1,12 +1,10 @@
-import streamlit as st
-import httpx
 import os
-from io import BytesIO
+
+import httpx
+import streamlit as st
 
 # API Configuration
-API_BASE_URL = os.getenv(
-    "API_BASE_URL", "https://synapse-instant-document-insight-production.up.railway.app"
-)
+API_BASE_URL = os.getenv("API_BASE_URL", "https://mugnihidayah-synapse-rag-api.hf.space")
 
 # SESSION STATE
 if "messages" not in st.session_state:
@@ -210,9 +208,7 @@ with st.sidebar:
                     st.session_state.session_id = session_id
 
                     # Upload files
-                    result = upload_files(
-                        st.session_state.api_key, session_id, uploaded_files
-                    )
+                    result = upload_files(st.session_state.api_key, session_id, uploaded_files)
                     if result:
                         st.session_state.active_document = {
                             "name": ", ".join([f.name for f in uploaded_files]),
@@ -269,41 +265,34 @@ if prompt := st.chat_input("Ask a question about your document..."):
             st.markdown(prompt)
 
         # Get answer from API
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                result = query_documents(
-                    st.session_state.api_key,
-                    st.session_state.session_id,
-                    prompt,
-                    language=lang_code,
-                    temperature=temperature,
-                    model=selected_model,
-                )
+        with st.chat_message("assistant"), st.spinner("Thinking..."):
+            result = query_documents(
+                st.session_state.api_key,
+                st.session_state.session_id,
+                prompt,
+                language=lang_code,
+                temperature=temperature,
+                model=selected_model,
+            )
 
-                if result:
-                    answer = result.get("answer", "No answer received")
-                    sources = result.get("sources", [])
+            if result:
+                answer = result.get("answer", "No answer received")
+                sources = result.get("sources", [])
 
-                    st.markdown(answer)
+                st.markdown(answer)
 
-                    # Show sources
-                    if sources:
-                        with st.expander("📚 Reference Sources"):
-                            for i, src in enumerate(sources):
-                                metadata = src.get("metadata", {})
-                                text = src.get("text", "No text available")
-                                st.markdown(
-                                    f"**Source {i+1}:** {metadata.get('source', 'Unknown')}"
-                                )
-                                with st.expander(
-                                    f"📄 View quoted text from Source {i+1}"
-                                ):
-                                    st.info(
-                                        text[:500] + "..." if len(text) > 500 else text
-                                    )
+                # Show sources
+                if sources:
+                    with st.expander("📚 Reference Sources"):
+                        for i, src in enumerate(sources):
+                            metadata = src.get("metadata", {})
+                            text = src.get("text", "No text available")
+                            st.markdown(
+                                f"**Source {i + 1}:** {metadata.get('source', 'Unknown')}"
+                            )
+                            with st.expander(f"📄 View quoted text from Source {i + 1}"):
+                                st.info(text[:500] + "..." if len(text) > 500 else text)
 
-                    st.session_state.messages.append(
-                        {"role": "assistant", "content": answer}
-                    )
-                else:
-                    st.error("Failed to get answer from API")
+                st.session_state.messages.append({"role": "assistant", "content": answer})
+            else:
+                st.error("Failed to get answer from API")
