@@ -21,7 +21,7 @@ from src.core.exceptions import DocumentProcessingError, VectorStoreError
 from src.core.logger import get_logger
 from src.db import get_db
 from src.db.models import APIKey
-from src.ingestion.chunkers import split_documents
+from src.ingestion.chunkers import extract_document_header, split_documents
 from src.ingestion.loaders import (
     get_supported_extensions,
     load_document_from_upload,
@@ -178,7 +178,11 @@ async def upload_documents(
             )
 
         # Chunk documents
+        header_chunk = extract_document_header(all_documents)
         chunks = split_documents(all_documents)
+
+        if header_chunk:
+            chunks.insert(0, header_chunk)
 
         # Store in pgvector
         stored_count = await store_documents(db, session.id, chunks)

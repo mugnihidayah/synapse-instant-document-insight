@@ -23,8 +23,8 @@ class TestSettings:
     def test_settings_has_default_values(self) -> None:
         """Test that settings has expected default values"""
         s = Settings()
-        assert s.chunk_size == 500
-        assert s.chunk_overlap == 100
+        assert s.chunk_size == 1000
+        assert s.chunk_overlap == 200
         assert s.retrieval_top_k == 10
         assert s.rerank_top_k == 3
 

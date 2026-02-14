@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS chat_history (
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS api_key_id UUID REFERENCES api_keys(id) ON DELETE CASCADE;
 
 -- Add full-text search column (update table documents)
-ALTER TABLE documents ADD COLUMN IF NOT EXISTS content_tsv tsvector GENERATED ALWAYS AS (to_tsvector('english', content)) STORED;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS content_tsv tsvector GENERATED ALWAYS AS (to_tsvector('simple', content)) STORED;
 
 -- Create GIN index for full text search
 CREATE INDEX IF NOT EXISTS documents_content_tsv_idx ON documents USING GIN(content_tsv);

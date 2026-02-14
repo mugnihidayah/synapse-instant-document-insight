@@ -7,10 +7,10 @@ This module provides centralized configuration class that:
 - Provides type-safe access to configuration values
 
 Usage:
-  from src.core.config import settings
+    from src.core.config import settings
 
-  api_key = settings.groq_api_key
-  model = settings.llm_model
+    api_key = settings.groq_api_key
+    model = settings.llm_model
 """
 
 import os
@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     Environment variable are case-insensitive
 
     Example:
-      Set GROQ_API_KEY in .env or environment to configure Groq API key
+        Set GROQ_API_KEY in .env or environment to configure Groq API key
     """
 
     model_config = SettingsConfigDict(
@@ -75,14 +75,14 @@ class Settings(BaseSettings):
     )
 
     chunk_size: int = Field(
-        default=500,
+        default=1000,
         ge=100,
         le=2000,
         description="Size of document chunks in characters",
     )
 
     chunk_overlap: int = Field(
-        default=100,
+        default=200,
         ge=0,
         le=500,
         description="Overlap between chunks in characters",

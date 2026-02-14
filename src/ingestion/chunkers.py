@@ -17,11 +17,11 @@ def create_text_splitter(
     Create a text splitter with specified aprameters
 
     Args:
-      chunk_size: Size of each chunk
-      chunk_overlap: Overlap between chunks
+        chunk_size: Size of each chunk
+        chunk_overlap: Overlap between chunks
 
     Returns:
-      configured RecursiveCharacterTextSplitter
+        configured RecursiveCharacterTextSplitter
     """
     if chunk_size is None:
         chunk_size = settings.chunk_size
@@ -44,16 +44,16 @@ def split_documents(
     Split documents into smaller chunks
 
     Args:
-      documents: List of langchain documents
-      chunk_size: Size of each chunk
-      chunk_overlap: Overlap between chunks
+        documents: List of langchain documents
+        chunk_size: Size of each chunk
+        chunk_overlap: Overlap between chunks
 
     Returns:
-      List of chunked documents
+        List of chunked documents
 
     Example:
-      docs = [Document(page_content="Long text...", metadata={})]
-      chunks = split_documents(docs, chunk_size=500)
+        docs = [Document(page_content="Long text...", metadata={})]
+        chunks = split_documents(docs, chunk_size=500)
     """
     if not documents:
         return []
@@ -62,3 +62,26 @@ def split_documents(
     chunks = splitter.split_documents(documents)
 
     return chunks
+
+
+def extract_document_header(documents: list[Document]) -> Document | None:
+    """
+    Extract document header as a metadata chunk.
+
+    Args:
+        documents: List of langchain documents from loader
+
+    Returns:
+        Document with first page content and metadata
+    """
+    if not documents:
+        return None
+
+    first_page = documents[0]
+
+    header_content = first_page.page_content[:2000]
+
+    return Document(
+        page_content=header_content,
+        metadata={**first_page.metadata, "chunk_type": "document_header"},
+    )
