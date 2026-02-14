@@ -8,29 +8,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Add HF metadata to README
-        run: |
-          cat > /tmp/header.yml << 'EOF'
-          ---
-          title: Synapse RAG API
-          emoji: 🧠
-          colorFrom: blue
-          colorTo: purple
-          sdk: docker
-          app_port: 7860
-          ---
-
-          EOF
-          cat /tmp/header.yml README.md > /tmp/README_NEW.md
-          mv /tmp/README_NEW.md README.md
-
-      - name: Push to HF Spaces
+      - name: Add HF metadata and push
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
+          # Create YAML header
+          printf '%s\n' '---' 'title: Synapse RAG API' 'emoji: 🧠' 'colorFrom: blue' 'colorTo: purple' 'sdk: docker' 'app_port: 7860' '---' '' > /tmp/header.yml
+
+          # Prepend to README
+          cat /tmp/header.yml README.md > /tmp/README_NEW.md
+          mv /tmp/README_NEW.md README.md
+
+          # Commit and push to HF
           git config user.name "mugnihidayah"
           git config user.email "mugnihidayah11@gmail.com"
+          git fetch --unshallow || true
+          git remote add hf https://mugnihidayah:$HF_TOKEN@huggingface.co/spaces/mugnihidayah/synapse-rag-api
           git add README.md
           git commit -m "Add HF metadata"
-          git push --force https://mugnihidayah:$HF_TOKEN@huggingface.co/spaces/mugnihidayah/synapse-rag-api main
+          git push --force hf main
