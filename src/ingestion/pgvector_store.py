@@ -77,7 +77,7 @@ async def store_documents(
                     session_id=session_id,
                     content=doc.page_content,
                     embedding=vector,
-                    metadata=doc.metadata or {},
+                    metadata_=doc.metadata or {},
                 )
                 db_documents.append(db_doc)
 
