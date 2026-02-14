@@ -5,7 +5,7 @@
 ### Instant Document Insights
 
 [![CI](https://github.com/mugnihidayah/synapse-instant-document-insight/workflows/CI/badge.svg)](https://github.com/mugnihidayah/synapse-instant-document-insight/actions)
-[![Deploy](https://img.shields.io/badge/Railway-Deployed-blueviolet?style=for-the-badge&logo=railway)](https://synapse-instant-document-insight-production.up.railway.app)
+[![Deploy](https://img.shields.io/badge/HF%20Spaces-Deployed-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black)](https://mugnihidayah-synapse-rag-api.hf.space)
 [![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://postgresql.org)
@@ -16,7 +16,7 @@
 
 [Features](#-features) • [Quick Start](#-quick-start) • [API Docs](#-api-documentation) • [Docker](#-docker) • [Tech Stack](#-tech-stack)
 
-🚀 **API Docs:** [synapse-instant-document-insight-production.up.railway.app](https://synapse-instant-document-insight-production.up.railway.app/docs)
+🚀 **API Docs:** [mugnihidayah-synapse-rag-api.hf.space/docs](https://mugnihidayah-synapse-rag-api.hf.space/docs)
 
 </div>
 
@@ -24,19 +24,22 @@
 
 ## Features
 
-| Feature                  | Description                                                      |
-| ------------------------ | ---------------------------------------------------------------- |
-| **Multi-format Support** | PDF, DOCX, TXT, more formats coming                              |
-| **REST API**             | FastAPI with auto-generated Swagger docs                         |
-| **Streaming**            | SSE streaming responses, ChatGPT-style                           |
-| **Bilingual**            | Responds in Indonesian or English based on your preference       |
-| **Session-based**        | Each user gets isolated document storage                         |
-| **API Key Auth**         | SHA256 hashed keys, stored in PostgreSQL                         |
-| **Rate Limiting**        | 50 queries/min per key (configurable)                            |
-| **Vector Search**        | PostgreSQL + pgvector for similarity search (384-dim embeddings) |
-| **JSON Logging**         | Structured logs for production debugging                         |
-| **Dockerized**           | One command to run everything                                    |
-| **Tested**               | Unit tests with Pytest, CI/CD with GitHub Actions                |
+| Feature                  | Description                                                        |
+| ------------------------ | ------------------------------------------------------------------ |
+| **Multi-format Support** | PDF, DOCX, TXT, more formats coming                                |
+| **REST API**             | FastAPI with auto-generated Swagger docs                           |
+| **Streaming**            | SSE streaming responses, ChatGPT-style                             |
+| **Hybrid Search**        | Vector similarity + BM25 full-text search combined                 |
+| **Reranking**            | Cohere reranker for improved retrieval accuracy                    |
+| **Doc Header Extraction**| Automatically extracts title/abstract for metadata questions       |
+| **Bilingual**            | Responds in Indonesian or English based on your preference         |
+| **Session-based**        | Each user gets isolated document storage                           |
+| **API Key Auth**         | SHA256 hashed keys, stored in PostgreSQL                           |
+| **Rate Limiting**        | 50 queries/min per key (configurable)                              |
+| **Vector Search**        | PostgreSQL + pgvector for similarity search (384-dim embeddings)   |
+| **JSON Logging**         | Structured logs for production debugging                           |
+| **Dockerized**           | One command to run everything                                      |
+| **Tested**               | Unit tests with Pytest, CI/CD with GitHub Actions                  |
 
 ---
 
@@ -104,7 +107,7 @@ uvicorn src.api.main:app --reload
 
 **Base URL (Local):** `http://localhost:8000/api/v1`
 
-**Base URL (Production):** `https://synapse-instant-document-insight-production.up.railway.app/api/v1`
+**Base URL (Production):** `https://mugnihidayah-synapse-rag-api.hf.space/api/v1`
 
 ### Authentication
 
@@ -163,7 +166,7 @@ curl -X POST "localhost:8000/api/v1/query/$SESSION" \
 
 **Swagger UI (Local):** http://localhost:8000/docs
 
-**Swagger UI (Production):** https://synapse-instant-document-insight-production.up.railway.app/docs
+**Swagger UI (Production):** https://mugnihidayah-synapse-rag-api.hf.space/docs
 
 ---
 
@@ -197,13 +200,15 @@ docker compose down         # Stop
 
 **Database:** PostgreSQL with pgvector extension
 
-**AI/ML:** LangChain, Groq LLM, HuggingFace embeddings (384-dim)
+**AI/ML:** LangChain, Groq LLM, HuggingFace embeddings (384-dim), Cohere Reranker
+
+**Search:** Hybrid retrieval (vector similarity + BM25 full-text), cross-encoder reranking
 
 **Auth & Security:** SHA256 key hashing, slowapi rate limiting
 
 **Logging:** structlog (JSON format)
 
-**DevOps:** Docker, GitHub Actions CI
+**DevOps:** Docker, GitHub Actions CI/CD, Hugging Face Spaces
 
 ---
 
@@ -250,9 +255,8 @@ synapse-instant-document-insight/
 - **File size:** Large files load into memory, no streaming upload yet
 - **Session expiry:** Sessions auto-delete after 24 hours
 - **Session isolation:** Sessions are not linked to API keys (no ownership check)
-- **Embedding model:** Fixed at 384 dimensions (multilingual-MiniLM-L12-v2)
-- **Full-text search:** Uses English-only `to_tsvector('english', ...)` for keyword search
 - **No export:** Cannot export chat history as PDF/document
+- **Cold start:** First request may be slow on free-tier hosting due to model loading
 
 ---
 
@@ -272,11 +276,12 @@ mypy src/                     # Type check
 # Required
 GROQ_API_KEY=gsk_your_key
 DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/db
+COHERE_API_KEY=your_cohere_key
 
 # Optional
 HUGGINGFACE_TOKEN=hf_xxx      # For private models
 LOG_LEVEL=info                # debug, info, warning, error
-PORT=8000
+PORT=7860
 ```
 
 ---
@@ -289,6 +294,6 @@ MIT — do whatever you want.
 
 <div align="center">
 
-**Built with FastAPI, LangChain, PostgreSQL & Docker**
+**Built with FastAPI, LangChain, PostgreSQL & Docker | Deployed on Hugging Face Spaces**
 
 </div>
