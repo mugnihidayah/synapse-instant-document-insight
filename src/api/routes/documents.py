@@ -197,8 +197,10 @@ async def get_document_file(
         )
 
     try:
-        session_uuid = row.session_id if isinstance(row.session_id, uuid.UUID) else uuid.UUID(
-            str(row.session_id)
+        session_uuid = (
+            row.session_id
+            if isinstance(row.session_id, uuid.UUID)
+            else uuid.UUID(str(row.session_id))
         )
     except ValueError:
         raise HTTPException(
