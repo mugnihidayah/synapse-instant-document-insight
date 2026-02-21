@@ -41,40 +41,135 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/query", tags=["Query"])
 
 
-def _score_document(meta: dict) -> float:
-    rerank_score = meta.get("rerank_score")
-    if isinstance(rerank_score, (int, float)):
-        # squash cross-encoder score to [0, 1]
-        return max(0.0, min(1.0, 1 / (1 + math.exp(-float(rerank_score)))))
+def _clamp_01(value: float) -> float:
+    return max(0.0, min(1.0, value))
 
-    hybrid_score = meta.get("hybrid_score")
-    if isinstance(hybrid_score, (int, float)):
-        return max(0.0, min(1.0, float(hybrid_score) / 0.03))
 
-    distance = meta.get("distance")
-    if isinstance(distance, (int, float)):
-        return max(0.0, min(1.0, 1.0 - float(distance)))
+def _coerce_float(value: object) -> float | None:
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
 
-    return 0.0
+
+def _normalize(values: list[float]) -> list[float]:
+    if not values:
+        return []
+
+    minimum = min(values)
+    maximum = max(values)
+    spread = maximum - minimum
+
+    if spread < 1e-9:
+        return [0.5 for _ in values]
+
+    return [_clamp_01((item - minimum) / spread) for item in values]
+
+
+def _sigmoid(value: float) -> float:
+    # Guard against overflow in extreme local reranker outputs.
+    if value >= 40:
+        return 1.0
+    if value <= -40:
+        return 0.0
+    return 1 / (1 + math.exp(-value))
+
+
+def _compute_display_scores(docs: list[LangchainDocument]) -> list[float]:
+    """
+    Compute citation scores using both reranker and retrieval signals.
+
+    Why:
+    - Avoid flat 0.50 scores when reranker outputs identical/near-identical values.
+    - Keep ranking signal meaningful across different reranker providers.
+    """
+    if not docs:
+        return []
+
+    rerank_raw: list[float | None] = []
+    retrieval_raw: list[float | None] = []
+
+    for doc in docs:
+        meta = doc.metadata
+        rerank_raw.append(_coerce_float(meta.get("rerank_score")))
+
+        hybrid_score = _coerce_float(meta.get("hybrid_score"))
+        if hybrid_score is not None:
+            retrieval_raw.append(hybrid_score)
+            continue
+
+        distance = _coerce_float(meta.get("distance"))
+        if distance is not None:
+            retrieval_raw.append(1.0 - distance)
+            continue
+
+        keyword_rank = _coerce_float(meta.get("keyword_rank"))
+        retrieval_raw.append(keyword_rank)
+
+    retrieval_scores = [0.0 for _ in docs]
+    retrieval_idx = [idx for idx, score in enumerate(retrieval_raw) if score is not None]
+    if retrieval_idx:
+        retrieval_norm = _normalize([float(retrieval_raw[idx]) for idx in retrieval_idx])
+        for idx, score in zip(retrieval_idx, retrieval_norm, strict=True):
+            retrieval_scores[idx] = score
+    elif len(docs) == 1:
+        retrieval_scores[0] = 1.0
+    else:
+        denominator = max(1, len(docs) - 1)
+        for idx in range(len(docs)):
+            retrieval_scores[idx] = 1.0 - (idx / denominator)
+
+    rerank_idx = [idx for idx, score in enumerate(rerank_raw) if score is not None]
+    if not rerank_idx:
+        return [round(_clamp_01(score), 4) for score in retrieval_scores]
+
+    rerank_values = [float(rerank_raw[idx]) for idx in rerank_idx]
+    if all(0.0 <= value <= 1.0 for value in rerank_values):
+        rerank_base = rerank_values
+    else:
+        rerank_base = [_sigmoid(value) for value in rerank_values]
+    rerank_norm = _normalize(rerank_base)
+
+    scores = []
+    rerank_position = {doc_idx: pos for pos, doc_idx in enumerate(rerank_idx)}
+    for idx, retrieval_score in enumerate(retrieval_scores):
+        position = rerank_position.get(idx)
+        if position is None:
+            score = retrieval_score
+        else:
+            # Weighted blend makes scores less flat while keeping rerank dominant.
+            score = (0.75 * rerank_norm[position]) + (0.25 * retrieval_score)
+        scores.append(round(_clamp_01(score), 4))
+
+    return scores
 
 
 def _build_sources(docs: list[LangchainDocument], query: str) -> list[SourceItem]:
     """Build enriched source items from retrieved documents."""
+    display_scores = _compute_display_scores(docs)
     sources = []
-    for doc in docs:
+    for idx, doc in enumerate(docs):
         meta = dict(doc.metadata)
+        raw_rerank = _coerce_float(meta.get("rerank_score"))
+        raw_hybrid = _coerce_float(meta.get("hybrid_score"))
+        raw_distance = _coerce_float(meta.get("distance"))
 
         chunk_id = str(meta.pop("id", ""))
         meta.pop("distance", None)
         meta.pop("hybrid_score", None)
         meta.pop("keyword_rank", None)
         meta.pop("rerank_score", None)
+        if raw_rerank is not None:
+            meta["raw_rerank_score"] = round(raw_rerank, 6)
+        if raw_hybrid is not None:
+            meta["raw_hybrid_score"] = round(raw_hybrid, 6)
+        if raw_distance is not None:
+            meta["raw_distance"] = round(raw_distance, 6)
 
         sources.append(
             SourceItem(
                 text=doc.page_content,
                 snippet=build_snippet(doc.page_content, query),
-                score=round(_score_document(doc.metadata), 4),
+                score=display_scores[idx],
                 chunk_id=chunk_id,
                 source=meta.get("source"),
                 page=meta.get("page"),
