@@ -83,6 +83,7 @@ CREATE INDEX IF NOT EXISTS documents_content_tsv_idx ON documents USING GIN(cont
 
 -- Index for fast similarity search
 CREATE INDEX IF NOT EXISTS documents_embedding_idx ON documents(session_id);
+CREATE INDEX IF NOT EXISTS documents_metadata_document_id_idx ON documents((metadata->>'document_id'));
 CREATE INDEX IF NOT EXISTS sessions_expires_idx ON sessions(expires_at);
 CREATE INDEX IF NOT EXISTS chat_history_session_idx ON chat_history(session_id, created_at);
 CREATE INDEX IF NOT EXISTS feedback_session_idx ON feedback(session_id, created_at);

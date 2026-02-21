@@ -38,7 +38,9 @@ coverage.xml
 *~
 data/
 opt/
+uploads/
 *.db
 chroma_db/
+tests/.tmp_storage/
 # Agent workflows
 .agent/

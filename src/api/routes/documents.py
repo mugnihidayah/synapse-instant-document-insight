@@ -5,6 +5,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
@@ -27,6 +28,7 @@ from src.core.logger import get_logger
 from src.db import get_db
 from src.db.models import APIKey
 from src.ingestion.chunkers import extract_document_header, split_documents
+from src.ingestion.file_storage import resolve_original_file_path, save_original_file
 from src.ingestion.loaders import get_supported_extensions, load_document_from_upload
 from src.ingestion.pgvector_store import store_documents
 
@@ -146,6 +148,7 @@ async def list_session_documents(
     items = [
         SessionDocumentItem(
             chunk_id=str(row.id),
+            document_id=(row.metadata or {}).get("document_id"),
             source=(row.metadata or {}).get("source"),
             page=(row.metadata or {}).get("page"),
             section=(row.metadata or {}).get("section"),
@@ -161,6 +164,89 @@ async def list_session_documents(
         page=page,
         page_size=page_size,
         items=items,
+    )
+
+
+@router.get("/{document_id}/file")
+@limiter.limit(RATE_LIMIT_SESSION)
+async def get_document_file(
+    request: Request,
+    document_id: str,
+    db: AsyncSession = Depends(get_db),
+    api_key: APIKey = Depends(get_api_key),
+) -> FileResponse:
+    """Serve original uploaded file for a logical document_id."""
+    stmt = text(
+        """
+        SELECT session_id,
+               metadata->>'file_path' AS file_path,
+               COALESCE(metadata->>'original_filename', metadata->>'source', 'document.bin')
+                 AS original_filename,
+               COALESCE(metadata->>'mime_type', 'application/octet-stream') AS mime_type
+        FROM documents
+        WHERE metadata->>'document_id' = :document_id
+        ORDER BY created_at ASC
+        LIMIT 1
+        """
+    )
+    row = (await db.execute(stmt, {"document_id": document_id})).first()
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document {document_id} not found",
+        )
+
+    try:
+        session_uuid = row.session_id if isinstance(row.session_id, uuid.UUID) else uuid.UUID(
+            str(row.session_id)
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document {document_id} not found",
+        ) from None
+
+    session = await session_service.get_session(db, session_uuid)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document {document_id} not found",
+        )
+
+    if session.api_key_id != api_key.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this document",
+        )
+
+    file_path = row.file_path
+    if not file_path:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Original file for document {document_id} not found",
+        )
+
+    try:
+        resolved_path = resolve_original_file_path(file_path)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Original file for document {document_id} not found",
+        ) from None
+
+    if not resolved_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Original file for document {document_id} not found",
+        )
+
+    original_filename = str(row.original_filename or f"{document_id}.bin")
+    original_filename = original_filename.replace('"', "")
+
+    return FileResponse(
+        path=str(resolved_path),
+        media_type=str(row.mime_type or "application/octet-stream"),
+        headers={"Content-Disposition": f'inline; filename="{original_filename}"'},
     )
 
 
@@ -211,11 +297,19 @@ async def _process_documents_sync(
     all_documents = []
 
     for payload in payloads:
+        document_metadata = {
+            "document_id": payload["document_id"],
+            "original_filename": payload["filename"],
+            "file_path": payload["file_path"],
+            "mime_type": payload["mime_type"],
+            "file_size_bytes": payload["file_size_bytes"],
+        }
         docs = load_document_from_upload(
             io.BytesIO(payload["content"]),
             payload["filename"],
             enable_ocr=enable_ocr,
             extract_tables=extract_tables,
+            document_metadata=document_metadata,
         )
         all_documents.extend(docs)
 
@@ -296,10 +390,27 @@ async def upload_documents(
                 detail=f"File {file.filename} exceeds {settings.max_upload_file_size_mb}MB limit",
             )
 
-        payloads.append(
-            UploadFilePayload(
+        try:
+            stored_file = save_original_file(
+                session_id=str(session.id),
                 filename=file.filename,
                 content=content,
+            )
+        except Exception as exc:
+            logger.error("upload_file_persist_failed", filename=file.filename, error=str(exc))
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to persist uploaded file {file.filename}",
+            ) from exc
+
+        payloads.append(
+            UploadFilePayload(
+                filename=stored_file.original_filename,
+                content=content,
+                document_id=stored_file.document_id,
+                file_path=stored_file.file_path,
+                mime_type=stored_file.mime_type,
+                file_size_bytes=stored_file.file_size_bytes,
             )
         )
 

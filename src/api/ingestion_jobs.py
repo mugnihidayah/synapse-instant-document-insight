@@ -21,6 +21,10 @@ logger = get_logger(__name__)
 class UploadFilePayload(TypedDict):
     filename: str
     content: bytes
+    document_id: str
+    file_path: str
+    mime_type: str
+    file_size_bytes: int
 
 
 _jobs: dict[str, asyncio.Task] = {}
@@ -73,11 +77,19 @@ async def _run_ingestion_job(
 
             all_documents = []
             for payload in payloads:
+                document_metadata = {
+                    "document_id": payload["document_id"],
+                    "original_filename": payload["filename"],
+                    "file_path": payload["file_path"],
+                    "mime_type": payload["mime_type"],
+                    "file_size_bytes": payload["file_size_bytes"],
+                }
                 docs = load_document_from_upload(
                     io.BytesIO(payload["content"]),
                     payload["filename"],
                     enable_ocr=enable_ocr,
                     extract_tables=extract_tables,
+                    document_metadata=document_metadata,
                 )
                 all_documents.extend(docs)
 

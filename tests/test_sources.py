@@ -31,6 +31,7 @@ def _build_sources(docs: list[LangchainDocument]) -> list[dict]:
                 "snippet": doc.page_content[:80],
                 "score": round(score, 4),
                 "chunk_id": chunk_id,
+                "document_id": meta.get("document_id"),
                 "source": meta.get("source"),
                 "page": meta.get("page"),
                 "metadata": meta,
@@ -121,6 +122,16 @@ class TestBuildSources:
         """Empty list should return empty sources."""
         assert _build_sources([]) == []
 
+    def test_document_id_optional(self):
+        docs = [
+            LangchainDocument(
+                page_content="content with doc id",
+                metadata={"id": "chunk-111", "document_id": "doc-xyz"},
+            )
+        ]
+        sources = _build_sources(docs)
+        assert sources[0]["document_id"] == "doc-xyz"
+
     def test_output_format_complete(self):
         """Verify all required fields present in output."""
         docs = [
@@ -141,6 +152,7 @@ class TestBuildSources:
         assert "text" in src
         assert "score" in src
         assert "chunk_id" in src
+        assert "document_id" in src
         assert "snippet" in src
         assert "source" in src
         assert "page" in src

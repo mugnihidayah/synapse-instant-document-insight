@@ -102,6 +102,7 @@ curl -X POST localhost:8000/api/v1/keys/ \
 | `GET` | `/documents/sessions/{session_id}/documents` | Paginated chunk list | Yes |
 | `DELETE` | `/documents/sessions/{session_id}` | Delete session | Yes |
 | `POST` | `/documents/upload/{session_id}` | Upload documents (async by default) | Yes |
+| `GET` | `/documents/{document_id}/file` | Stream original uploaded file (`inline`) | Yes |
 | `GET` | `/documents/supported-formats` | Supported upload formats | No |
 | `POST` | `/query/{session_id}` | Non-streaming query | Yes |
 | `POST` | `/query/stream/{session_id}` | Streaming query (SSE) | Yes |
@@ -157,6 +158,17 @@ Example payload with filters/debug:
     "chunk_types": ["content"],
     "content_origin": "text+ocr"
   }
+}
+```
+
+Source item in query response now includes optional `document_id` (used by frontend to request the original file):
+
+```json
+{
+  "chunk_id": "chunk_abc",
+  "document_id": "doc456",
+  "source": "report.pdf",
+  "page": 3
 }
 ```
 
@@ -275,9 +287,11 @@ QUERY_REWRITE_ENABLED=true
 
 # Ingestion
 INGESTION_ASYNC_DEFAULT=true
+UPLOAD_DIR=./uploads
+# On Hugging Face Spaces set UPLOAD_DIR=/data/uploads for persistent storage
 ENABLE_OCR=true
 ENABLE_TABLE_EXTRACTION=true
-MAX_UPLOAD_FILE_SIZE_MB=25
+MAX_UPLOAD_FILE_SIZE_MB=50
 
 # Analytics / export
 USAGE_DAILY_QUERY_QUOTA=1000

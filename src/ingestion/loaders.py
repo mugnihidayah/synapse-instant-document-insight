@@ -164,6 +164,7 @@ def load_document_from_upload(
     *,
     enable_ocr: bool = True,
     extract_tables: bool = False,
+    document_metadata: dict[str, Any] | None = None,
 ) -> list[Document]:
     """
     Load document from uploaded file.
@@ -187,7 +188,13 @@ def load_document_from_upload(
         )
 
     if ext in IMAGE_EXTENSIONS:
-        return _load_image_from_upload(uploaded_file, filename, ext, enable_ocr=enable_ocr)
+        return _load_image_from_upload(
+            uploaded_file,
+            filename,
+            ext,
+            enable_ocr=enable_ocr,
+            document_metadata=document_metadata,
+        )
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
         if hasattr(uploaded_file, "seek"):
@@ -208,6 +215,8 @@ def load_document_from_upload(
             doc.metadata["content_origin"] = "text"
             if "page" in doc.metadata:
                 doc.metadata["page"] = doc.metadata["page"] + 1
+            if document_metadata:
+                doc.metadata.update(document_metadata)
 
         if ext == ".pdf" and enable_ocr:
             ocr_texts = _extract_pdf_image_text(tmp_path)
@@ -245,6 +254,7 @@ def _load_image_from_upload(
     ext: str,
     *,
     enable_ocr: bool = True,
+    document_metadata: dict[str, Any] | None = None,
 ) -> list[Document]:
     """Load image file and extract text via OCR."""
     if not enable_ocr:
@@ -273,6 +283,7 @@ def _load_image_from_upload(
                     "source_type": "image",
                     "total_pages": 1,
                     "content_origin": "ocr",
+                    **(document_metadata or {}),
                 },
             )
         ]

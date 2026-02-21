@@ -21,6 +21,14 @@ from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def _default_upload_dir() -> Path:
+    """Prefer HF persistent storage when available."""
+    data_root = Path("/data")
+    if data_root.exists() and data_root.is_dir():
+        return data_root / "uploads"
+    return Path("./uploads")
+
+
 class Settings(BaseSettings):
     """
     Application settings loaded from environment variables
@@ -206,10 +214,15 @@ class Settings(BaseSettings):
     )
 
     max_upload_file_size_mb: int = Field(
-        default=25,
+        default=50,
         ge=1,
         le=200,
         description="Maximum single file upload size in MB.",
+    )
+
+    upload_dir: Path = Field(
+        default_factory=_default_upload_dir,
+        description="Directory to store original uploaded files.",
     )
 
     usage_daily_query_quota: int = Field(
@@ -263,6 +276,7 @@ class Settings(BaseSettings):
         if self.huggingface_token:
             os.environ["HUGGINGFACE_TOKEN"] = self.huggingface_token
         self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self.upload_dir.mkdir(parents=True, exist_ok=True)
 
 
 @lru_cache

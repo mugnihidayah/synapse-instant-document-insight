@@ -50,6 +50,7 @@ class SessionDocumentItem(BaseModel):
     """Document chunk listing item for session browsing."""
 
     chunk_id: str
+    document_id: str | None = None
     source: str | None = None
     page: int | None = None
     section: str | None = None
@@ -146,6 +147,7 @@ class SourceItem(BaseModel):
     snippet: str | None = None
     score: float = Field(ge=0, le=1, description="Relevance score (0-1)")
     chunk_id: str = Field(description="Unique chunk identifier")
+    document_id: str | None = Field(default=None, description="Original uploaded document id")
     source: str | None = None
     page: int | None = None
     metadata: dict = Field(default_factory=dict)

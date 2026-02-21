@@ -159,6 +159,7 @@ def _build_sources(docs: list[LangchainDocument], query: str) -> list[SourceItem
     sources = []
     for idx, doc in enumerate(docs):
         meta = dict(doc.metadata)
+        document_id = meta.get("document_id")
         raw_rerank = _coerce_float(meta.get("rerank_score"))
         raw_hybrid = _coerce_float(meta.get("hybrid_score"))
         raw_distance = _coerce_float(meta.get("distance"))
@@ -168,6 +169,7 @@ def _build_sources(docs: list[LangchainDocument], query: str) -> list[SourceItem
         meta.pop("hybrid_score", None)
         meta.pop("keyword_rank", None)
         meta.pop("rerank_score", None)
+        meta.pop("file_path", None)
         if raw_rerank is not None:
             meta["raw_rerank_score"] = round(raw_rerank, 6)
         if raw_hybrid is not None:
@@ -181,6 +183,7 @@ def _build_sources(docs: list[LangchainDocument], query: str) -> list[SourceItem
                 snippet=build_snippet(doc.page_content, query),
                 score=display_scores[idx],
                 chunk_id=chunk_id,
+                document_id=str(document_id) if document_id else None,
                 source=meta.get("source"),
                 page=meta.get("page"),
                 metadata=meta,
