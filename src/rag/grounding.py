@@ -25,7 +25,9 @@ def compute_grounding_score(answer: str, source_texts: list[str]) -> float:
     return round(matched / len(answer_tokens), 4)
 
 
-def is_grounded(answer: str, source_texts: list[str], threshold: float | None = None) -> tuple[bool, float]:
+def is_grounded(
+    answer: str, source_texts: list[str], threshold: float | None = None
+) -> tuple[bool, float]:
     score = compute_grounding_score(answer, source_texts)
     limit = settings.groundedness_threshold if threshold is None else threshold
     return score >= limit, score

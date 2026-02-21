@@ -125,7 +125,8 @@ def apply_mmr_diversification(
             diversity_penalty = 0.0
             if selected:
                 diversity_penalty = max(
-                    _lexical_similarity(doc.page_content, chosen.page_content) for chosen in selected
+                    _lexical_similarity(doc.page_content, chosen.page_content)
+                    for chosen in selected
                 )
 
             mmr_score = (lambda_mult * relevance) - ((1 - lambda_mult) * diversity_penalty)

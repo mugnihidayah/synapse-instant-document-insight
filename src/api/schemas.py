@@ -71,7 +71,9 @@ class QueryFilters(BaseModel):
     """Metadata filters applied before retrieval."""
 
     sources: list[str] | None = Field(default=None, description="Filter by source filename")
-    source_type: str | None = Field(default=None, description="Filter by source type (pdf, txt, docx)")
+    source_type: str | None = Field(
+        default=None, description="Filter by source type (pdf, txt, docx)"
+    )
     page_from: int | None = Field(default=None, ge=1, description="Start page (1-indexed)")
     page_to: int | None = Field(default=None, ge=1, description="End page (1-indexed)")
     chunk_types: list[str] | None = Field(default=None, description="Filter by chunk_type metadata")
