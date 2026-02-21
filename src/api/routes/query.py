@@ -7,13 +7,14 @@ from collections.abc import AsyncGenerator
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
+from langchain_core.documents import Document as LangchainDocument
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
 
 from src.api import session as session_service
 from src.api.dependencies import get_api_key
 from src.api.rate_limiter import RATE_LIMIT_QUERY, limiter
-from src.api.schemas import QueryRequest, QueryResponse
+from src.api.schemas import QueryRequest, QueryResponse, SourceItem
 from src.core.config import settings
 from src.core.logger import get_logger
 from src.db import get_db
@@ -33,6 +34,37 @@ logger = get_logger(__name__)
 
 
 router = APIRouter(prefix="/query", tags=["Query"])
+
+
+def _build_sources(docs: list[LangchainDocument]) -> list[SourceItem]:
+    """Build enriched source items from retrieved documents."""
+    sources = []
+    for doc in docs:
+        meta = dict(doc.metadata)
+
+        # Extract and remove internal search fields
+        distance = meta.pop("distance", None)
+        hybrid_score = meta.pop("hybrid_score", None)
+        meta.pop("keyword_rank", None)
+        chunk_id = meta.pop("id", "")
+
+        # Normalize score to 0-1
+        if hybrid_score is not None:
+            score = min(hybrid_score / 0.03, 1.0)
+        elif distance is not None:
+            score = max(0.0, 1.0 - float(distance))
+        else:
+            score = 0.0
+
+        sources.append(
+            SourceItem(
+                text=doc.page_content,
+                score=round(score, 4),
+                chunk_id=chunk_id,
+                metadata=meta,
+            )
+        )
+    return sources
 
 
 @router.post("/stream/{session_id}")
@@ -104,7 +136,7 @@ async def query_stream(
 
         # Format context
         context = "\n\n".join([doc.page_content for doc in docs])
-        sources = [{"text": doc.page_content, "metadata": doc.metadata} for doc in docs]
+        sources = _build_sources(docs)
 
     except Exception as e:
         raise HTTPException(
@@ -138,7 +170,7 @@ async def query_stream(
             await db.commit()
 
             # Send sources
-            yield f"data: {json.dumps({'sources': sources})}\n\n"
+            yield f"data: {json.dumps({'sources': [s.model_dump() for s in sources]})}\n\n"
             yield "data: [DONE]\n\n"
 
         except Exception as e:
@@ -241,7 +273,7 @@ async def query(
             }
         )
 
-        sources = [{"text": doc.page_content, "metadata": doc.metadata} for doc in docs]
+        sources = _build_sources(docs)
 
         logger.info(
             "query_completed",

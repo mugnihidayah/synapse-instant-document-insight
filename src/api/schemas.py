@@ -65,11 +65,20 @@ class QueryRequest(BaseModel):
     )
 
 
+class SourceItem(BaseModel):
+    """Individual source/citation item"""
+
+    text: str
+    score: float = Field(ge=0, le=1, description="Relevance score (0-1)")
+    chunk_id: str = Field(description="Unique chunk identifier")
+    metadata: dict = Field(default_factory=dict)
+
+
 class QueryResponse(BaseModel):
     """Response from RAG query"""
 
     answer: str
-    sources: list[dict]
+    sources: list[SourceItem]
     model_used: str
 
 

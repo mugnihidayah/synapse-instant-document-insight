@@ -108,9 +108,12 @@ def load_document_from_upload(uploaded_file: Any, filename: str) -> list[Documen
         loader = loader_class(tmp_path)
         documents: list[Document] = loader.load()
 
-        # update metadata with original filename
+        # update metadata with original filename and document info
+        total_pages = len(documents)
         for doc in documents:
             doc.metadata["source"] = filename
+            doc.metadata["source_type"] = ext.lstrip(".")
+            doc.metadata["total_pages"] = total_pages
             if "page" in doc.metadata:
                 doc.metadata["page"] = doc.metadata["page"] + 1
 
