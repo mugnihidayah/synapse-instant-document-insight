@@ -65,6 +65,16 @@ def _normalize(values: list[float]) -> list[float]:
     return [_clamp_01((item - minimum) / spread) for item in values]
 
 
+def _collect_indexed_scores(values: list[float | None], indices: list[int]) -> list[float]:
+    """Collect non-null scores from selected positions in a stable order."""
+    collected: list[float] = []
+    for idx in indices:
+        value = values[idx]
+        if value is not None:
+            collected.append(value)
+    return collected
+
+
 def _sigmoid(value: float) -> float:
     # Guard against overflow in extreme local reranker outputs.
     if value >= 40:
@@ -108,7 +118,7 @@ def _compute_display_scores(docs: list[LangchainDocument]) -> list[float]:
     retrieval_scores = [0.0 for _ in docs]
     retrieval_idx = [idx for idx, score in enumerate(retrieval_raw) if score is not None]
     if retrieval_idx:
-        retrieval_norm = _normalize([float(retrieval_raw[idx]) for idx in retrieval_idx])
+        retrieval_norm = _normalize(_collect_indexed_scores(retrieval_raw, retrieval_idx))
         for idx, score in zip(retrieval_idx, retrieval_norm, strict=True):
             retrieval_scores[idx] = score
     elif len(docs) == 1:
@@ -122,7 +132,7 @@ def _compute_display_scores(docs: list[LangchainDocument]) -> list[float]:
     if not rerank_idx:
         return [round(_clamp_01(score), 4) for score in retrieval_scores]
 
-    rerank_values = [float(rerank_raw[idx]) for idx in rerank_idx]
+    rerank_values = _collect_indexed_scores(rerank_raw, rerank_idx)
     if all(0.0 <= value <= 1.0 for value in rerank_values):
         rerank_base = rerank_values
     else:
