@@ -50,6 +50,22 @@ class Session(Base):
         Integer,
         default=0,
     )
+    ingestion_status: Mapped[str] = mapped_column(
+        String(20),
+        default="idle",
+    )
+    ingestion_error: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    ingestion_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    ingestion_completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     metadata_: Mapped[dict] = mapped_column(
         "metadata",
         JSONB,
@@ -65,6 +81,14 @@ class Session(Base):
         back_populates="session",
         cascade="all, delete-orphan",
         order_by="ChatMessage.created_at",
+    )
+    feedback_items: Mapped[list["Feedback"]] = relationship(
+        back_populates="session",
+        cascade="all, delete-orphan",
+    )
+    usage_events: Mapped[list["UsageEvent"]] = relationship(
+        back_populates="session",
+        cascade="all, delete-orphan",
     )
 
 
@@ -102,6 +126,14 @@ class APIKey(Base):
     last_used_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
+    )
+    feedback_items: Mapped[list["Feedback"]] = relationship(
+        back_populates="api_key",
+        cascade="all, delete-orphan",
+    )
+    usage_events: Mapped[list["UsageEvent"]] = relationship(
+        back_populates="api_key",
+        cascade="all, delete-orphan",
     )
 
 
@@ -175,4 +207,100 @@ class ChatMessage(Base):
     # relationship
     session: Mapped["Session"] = relationship(
         back_populates="chat_messages",
+    )
+
+
+class Feedback(Base):
+    """User feedback on generated answers."""
+
+    __tablename__ = "feedback"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("sessions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    api_key_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("api_keys.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    question: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    answer: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    rating: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
+    comment: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    metadata_: Mapped[dict] = mapped_column(
+        "metadata",
+        JSONB,
+        default=dict,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+    session: Mapped["Session"] = relationship(
+        back_populates="feedback_items",
+    )
+    api_key: Mapped["APIKey"] = relationship(
+        back_populates="feedback_items",
+    )
+
+
+class UsageEvent(Base):
+    """Tracking table for API usage analytics and quotas."""
+
+    __tablename__ = "usage_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    api_key_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("api_keys.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    session_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("sessions.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    event_type: Mapped[str] = mapped_column(
+        String(40),
+        nullable=False,
+    )
+    metadata_: Mapped[dict] = mapped_column(
+        "metadata",
+        JSONB,
+        default=dict,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+    api_key: Mapped["APIKey"] = relationship(
+        back_populates="usage_events",
+    )
+    session: Mapped["Session"] = relationship(
+        back_populates="usage_events",
     )

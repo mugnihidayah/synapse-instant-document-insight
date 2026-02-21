@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY pyproject.toml README.md ./
 COPY src/ src/
 # Install CPU-only PyTorch first (MUCH smaller than full torch)
-RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
 # Install remaining dependencies
 RUN pip install --no-cache-dir -e ".[api]"
 # Clean up

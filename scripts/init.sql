@@ -8,6 +8,10 @@ CREATE TABLE IF NOT EXISTS sessions (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   expires_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() + INTERVAL '24 hours',
   document_count INTEGER DEFAULT 0,
+  ingestion_status VARCHAR(20) DEFAULT 'idle',
+  ingestion_error TEXT,
+  ingestion_started_at TIMESTAMP WITH TIME ZONE,
+  ingestion_completed_at TIMESTAMP WITH TIME ZONE,
   metadata JSONB DEFAULT '{}'
 );
 
@@ -41,8 +45,35 @@ CREATE TABLE IF NOT EXISTS chat_history (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Feedback table
+CREATE TABLE IF NOT EXISTS feedback (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  session_id UUID REFERENCES sessions(id) ON DELETE CASCADE,
+  api_key_id UUID REFERENCES api_keys(id) ON DELETE CASCADE,
+  question TEXT NOT NULL,
+  answer TEXT NOT NULL,
+  rating INTEGER NOT NULL,
+  comment TEXT,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Usage tracking table
+CREATE TABLE IF NOT EXISTS usage_events (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  api_key_id UUID REFERENCES api_keys(id) ON DELETE CASCADE,
+  session_id UUID REFERENCES sessions(id) ON DELETE CASCADE,
+  event_type VARCHAR(40) NOT NULL,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Add api_key_id to sessions table
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS api_key_id UUID REFERENCES api_keys(id) ON DELETE CASCADE;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ingestion_status VARCHAR(20) DEFAULT 'idle';
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ingestion_error TEXT;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ingestion_started_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ingestion_completed_at TIMESTAMP WITH TIME ZONE;
 
 -- Add full-text search column (update table documents)
 ALTER TABLE documents ADD COLUMN IF NOT EXISTS content_tsv tsvector GENERATED ALWAYS AS (to_tsvector('simple', content)) STORED;
@@ -54,6 +85,10 @@ CREATE INDEX IF NOT EXISTS documents_content_tsv_idx ON documents USING GIN(cont
 CREATE INDEX IF NOT EXISTS documents_embedding_idx ON documents(session_id);
 CREATE INDEX IF NOT EXISTS sessions_expires_idx ON sessions(expires_at);
 CREATE INDEX IF NOT EXISTS chat_history_session_idx ON chat_history(session_id, created_at);
+CREATE INDEX IF NOT EXISTS feedback_session_idx ON feedback(session_id, created_at);
+CREATE INDEX IF NOT EXISTS feedback_api_key_idx ON feedback(api_key_id, created_at);
+CREATE INDEX IF NOT EXISTS usage_events_api_key_idx ON usage_events(api_key_id, created_at);
+CREATE INDEX IF NOT EXISTS usage_events_session_idx ON usage_events(session_id, created_at);
 
 -- HNSW index for fast approximate nearest neighbor search
 CREATE INDEX IF NOT EXISTS documents_embedding_hnsw_idx 

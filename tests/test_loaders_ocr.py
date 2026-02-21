@@ -1,10 +1,12 @@
 """Tests for multi-modal document loading with OCR support."""
 
+import importlib.util
 import io
 import os
 import tempfile
 
 import fitz  # PyMuPDF
+import pytest
 from PIL import Image, ImageDraw
 
 from src.ingestion.loaders import (
@@ -15,6 +17,8 @@ from src.ingestion.loaders import (
     get_supported_extensions,
     load_document_from_upload,
 )
+
+HAS_RAPIDOCR = importlib.util.find_spec("rapidocr_onnxruntime") is not None
 
 
 class TestSupportedExtensions:
@@ -39,6 +43,7 @@ class TestSupportedExtensions:
             assert ext not in LOADER_MAPPING
 
 
+@pytest.mark.skipif(not HAS_RAPIDOCR, reason="rapidocr_onnxruntime is not installed")
 class TestImageOCR:
     """Test standalone image upload with OCR."""
 
@@ -101,6 +106,7 @@ class TestTxtUpload:
         assert docs[0].metadata["content_origin"] == "text"
 
 
+@pytest.mark.skipif(not HAS_RAPIDOCR, reason="rapidocr_onnxruntime is not installed")
 class TestPDFWithImages:
     """Test PDF embedded image extraction."""
 
@@ -128,10 +134,11 @@ class TestPDFWithImages:
         page.insert_image(rect, stream=img_bytes.getvalue())
 
         # Save PDF
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-            pdf.save(tmp.name)
-            pdf.close()
-            return tmp.name
+        fd, tmp_path = tempfile.mkstemp(suffix=".pdf")
+        os.close(fd)
+        pdf.save(tmp_path)
+        pdf.close()
+        return tmp_path
 
     def test_extract_pdf_image_text(self):
         """Should extract OCR text from images embedded in PDF."""

@@ -66,3 +66,31 @@ async def get_session_for_key(
     if session and session.api_key_id == api_key_id:
         return session
     return None
+
+
+async def set_ingestion_status(
+    db: AsyncSession,
+    session_id: uuid.UUID,
+    status: str,
+    *,
+    error: str | None = None,
+) -> Session | None:
+    """Update ingestion status and timestamps for a session."""
+    session = await get_session(db, session_id)
+    if not session:
+        return None
+
+    now = datetime.now(UTC)
+    session.ingestion_status = status
+    session.ingestion_error = error
+
+    if status == "processing":
+        session.ingestion_started_at = now
+        session.ingestion_completed_at = None
+    elif status in {"ready", "failed"}:
+        if session.ingestion_started_at is None:
+            session.ingestion_started_at = now
+        session.ingestion_completed_at = now
+
+    await db.flush()
+    return session

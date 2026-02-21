@@ -16,7 +16,7 @@ from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.api.rate_limiter import limiter
-from src.api.routes import documents_router, keys_router, query_router
+from src.api.routes import documents_router, insights_router, keys_router, query_router
 from src.api.session import cleanup_expired_sessions
 from src.core.config import settings
 from src.core.logger import get_logger, setup_logging
@@ -103,6 +103,7 @@ def create_app() -> FastAPI:
     app.include_router(documents_router, prefix="/api/v1")
     app.include_router(query_router, prefix="/api/v1")
     app.include_router(keys_router, prefix="/api/v1")
+    app.include_router(insights_router, prefix="/api/v1")
 
     return app
 

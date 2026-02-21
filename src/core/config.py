@@ -95,11 +95,56 @@ class Settings(BaseSettings):
         description="Number of documents to retrieve before reranking",
     )
 
+    retrieval_fetch_k: int = Field(
+        default=20,
+        ge=5,
+        le=100,
+        description="Initial retrieval count before MMR/diversification",
+    )
+
+    dynamic_top_k_min: int = Field(
+        default=4,
+        ge=1,
+        le=20,
+        description="Minimum dynamic top_k for retrieval",
+    )
+
+    dynamic_top_k_max: int = Field(
+        default=10,
+        ge=1,
+        le=30,
+        description="Maximum dynamic top_k for retrieval",
+    )
+
     rerank_top_k: int = Field(
         default=3,
         ge=1,
         le=10,
         description="Number of documents to keep after reranking",
+    )
+
+    use_mmr: bool = Field(
+        default=True,
+        description="Apply lightweight MMR diversification after reranking",
+    )
+
+    mmr_lambda: float = Field(
+        default=0.7,
+        ge=0,
+        le=1,
+        description="Balance relevance/diversity in MMR (higher=relevance)",
+    )
+
+    groundedness_threshold: float = Field(
+        default=0.15,
+        ge=0,
+        le=1,
+        description="Minimum lexical grounding score required for strict grounding mode",
+    )
+
+    query_rewrite_enabled: bool = Field(
+        default=True,
+        description="Enable lightweight query rewrite before retrieval",
     )
 
     cache_dir: Path = Field(
@@ -145,6 +190,42 @@ class Settings(BaseSettings):
         description="Weight for keyword search in hybrid search (0-1)",
     )
 
+    ingestion_async_default: bool = Field(
+        default=True,
+        description="Default upload mode. True runs ingestion in background.",
+    )
+
+    enable_ocr: bool = Field(
+        default=True,
+        description="Enable OCR for image files and scanned PDF images.",
+    )
+
+    enable_table_extraction: bool = Field(
+        default=True,
+        description="Enable lightweight table extraction for PDF pages.",
+    )
+
+    max_upload_file_size_mb: int = Field(
+        default=25,
+        ge=1,
+        le=200,
+        description="Maximum single file upload size in MB.",
+    )
+
+    usage_daily_query_quota: int = Field(
+        default=1000,
+        ge=1,
+        le=200000,
+        description="Soft quota for queries per API key per day.",
+    )
+
+    export_max_messages: int = Field(
+        default=200,
+        ge=10,
+        le=2000,
+        description="Maximum number of chat messages included in exports.",
+    )
+
     @field_validator("groq_api_key", "huggingface_token")
     @classmethod
     def check_not_placeholder(cls, v: str, info) -> str:
@@ -157,6 +238,14 @@ class Settings(BaseSettings):
                 "Please set a valid API key in the environment or .env file.",
                 stacklevel=2,
             )
+        return v
+
+    @field_validator("dynamic_top_k_max")
+    @classmethod
+    def validate_dynamic_top_k_range(cls, v: int, info) -> int:
+        min_value = info.data.get("dynamic_top_k_min", 1)
+        if v < min_value:
+            raise ValueError("dynamic_top_k_max must be >= dynamic_top_k_min")
         return v
 
     @property

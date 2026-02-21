@@ -1,6 +1,6 @@
-<div align="center">
+﻿<div align="center">
 
-# 🧠 Synapse
+# Synapse
 
 ### Instant Document Insights
 
@@ -12,11 +12,11 @@
 [![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://docker.com)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
-**A RAG API for document Q&A — upload your PDFs, ask questions, get answers with citations.**
+**A multimodal RAG API for document Q&A: upload docs, ask questions, get grounded answers with citations.**
 
-[Features](#-features) • [Quick Start](#-quick-start) • [API Docs](#-api-documentation) • [Docker](#-docker) • [Tech Stack](#-tech-stack)
+[Features](#features) • [Quick Start](#quick-start) • [API](#api-documentation) • [Eval](#evaluation) • [Tech Stack](#tech-stack)
 
-🚀 **API Docs:** [mugnihidayah-synapse-rag-api.hf.space/docs](https://mugnihidayah-synapse-rag-api.hf.space/docs)
+API Docs: [mugnihidayah-synapse-rag-api.hf.space/docs](https://mugnihidayah-synapse-rag-api.hf.space/docs)
 
 </div>
 
@@ -24,22 +24,14 @@
 
 ## Features
 
-| Feature                  | Description                                                        |
-| ------------------------ | ------------------------------------------------------------------ |
-| **Multi-format Support** | PDF, DOCX, TXT, more formats coming                                |
-| **REST API**             | FastAPI with auto-generated Swagger docs                           |
-| **Streaming**            | SSE streaming responses, ChatGPT-style                             |
-| **Hybrid Search**        | Vector similarity + BM25 full-text search combined                 |
-| **Reranking**            | Cohere reranker for improved retrieval accuracy                    |
-| **Doc Header Extraction**| Automatically extracts title/abstract for metadata questions       |
-| **Bilingual**            | Responds in Indonesian or English based on your preference         |
-| **Session-based**        | Each user gets isolated document storage                           |
-| **API Key Auth**         | SHA256 hashed keys, stored in PostgreSQL                           |
-| **Rate Limiting**        | 50 queries/min per key (configurable)                              |
-| **Vector Search**        | PostgreSQL + pgvector for similarity search (384-dim embeddings)   |
-| **JSON Logging**         | Structured logs for production debugging                           |
-| **Dockerized**           | One command to run everything                                      |
-| **Tested**               | Unit tests with Pytest, CI/CD with GitHub Actions                  |
+- Multimodal ingestion: `PDF`, `DOCX`, `TXT`, image files (`PNG/JPG/JPEG/WEBP`) with OCR.
+- Async ingestion pipeline: upload queue with status (`queued`, `processing`, `ready`, `failed`).
+- Retrieval upgrades: hybrid search (vector + keyword), reranking, dynamic `top_k`, MMR diversification.
+- Query quality: contextualization, query rewrite, strict grounding guardrail, richer citations.
+- Metadata filters at query time: by source, page range, chunk type, content origin.
+- Session tools: session status, paginated chunk listing, session export (`markdown`/`json`).
+- Product signals: feedback endpoint and usage analytics with daily query quota.
+- Secure API key auth, rate limiting, structured JSON logging.
 
 ---
 
@@ -51,53 +43,31 @@
 git clone https://github.com/mugnihidayah/synapse-instant-document-insight.git
 cd synapse-instant-document-insight
 
-# Add your Groq API key
+# set required env vars
 echo "GROQ_API_KEY=gsk_your_key_here" > .env
 
-# Start API + PostgreSQL
 docker compose up -d
-
-# Open http://localhost:8000/docs
+# open http://localhost:8000/docs
 ```
 
 ### Local Development
-
-**Linux/macOS:**
 
 ```bash
 git clone https://github.com/mugnihidayah/synapse-instant-document-insight.git
 cd synapse-instant-document-insight
 
-python -m venv venv && source venv/bin/activate
-pip install -e ".[dev,api]"
+python -m venv .venv
+# Linux/macOS:
+source .venv/bin/activate
+# Windows PowerShell:
+# .venv\Scripts\Activate.ps1
 
-# Start PostgreSQL only
+pip install -e ".[dev,api]"
 docker compose up db -d
 
-# Create tables
-psql $DATABASE_URL < scripts/init.sql
+# initialize/update schema (run this on your DB, including Neon)
+psql "$DATABASE_URL" -f scripts/init.sql
 
-# Run the API
-uvicorn src.api.main:app --reload
-```
-
-**Windows (PowerShell):**
-
-```powershell
-git clone https://github.com/mugnihidayah/synapse-instant-document-insight.git
-cd synapse-instant-document-insight
-
-python -m venv venv
-venv\Scripts\activate
-pip install -e ".[dev,api]"
-
-# Start PostgreSQL only
-docker compose up db -d
-
-# Create tables (use psql or run manually in pgAdmin)
-# Copy contents of scripts/init.sql and execute in your PostgreSQL client
-
-# Run the API
 uvicorn src.api.main:app --reload
 ```
 
@@ -105,167 +75,165 @@ uvicorn src.api.main:app --reload
 
 ## API Documentation
 
-**Base URL (Local):** `http://localhost:8000/api/v1`
-
-**Base URL (Production):** `https://mugnihidayah-synapse-rag-api.hf.space/api/v1`
+Base URL (local): `http://localhost:8000/api/v1`
 
 ### Authentication
 
-All endpoints except `/keys/` need an API key:
+- `POST /keys/` does not require auth.
+- All other endpoints require header: `X-API-Key: sk-...`
+
+Create API key:
 
 ```bash
-# First, create a key
 curl -X POST localhost:8000/api/v1/keys/ \
   -H "Content-Type: application/json" \
-  -d '{"name": "my-app"}'
-
-# Response: {"api_key": "sk-abc123...", "key_id": "...", ...}
-# Save that key! It won't be shown again.
-
-# Then use it in all requests
-curl -H "X-API-Key: sk-abc123..." localhost:8000/api/v1/documents/sessions
+  -d '{"name":"my-app"}'
 ```
 
 ### Endpoints
 
-| Method   | Endpoint                   | What it does                | Needs auth? |
-| -------- | -------------------------- | --------------------------- | ----------- |
-| `POST`   | `/keys/`                   | Get an API key              | No          |
-| `GET`    | `/keys/`                   | List your keys (hashed)     | No          |
-| `DELETE` | `/keys/{id}`               | Revoke a key                | No          |
-| `POST`   | `/documents/sessions`      | Start a new session         | Yes         |
-| `GET`    | `/documents/sessions/{id}` | Check session status        | Yes         |
-| `DELETE` | `/documents/sessions/{id}` | Delete session and docs     | Yes         |
-| `POST`   | `/documents/upload/{id}`   | Upload files to session     | Yes         |
-| `POST`   | `/query/{id}`              | Ask a question              | Yes         |
-| `POST`   | `/query/stream/{id}`       | Ask with streaming response | Yes         |
+| Method | Endpoint | Description | Auth |
+| --- | --- | --- | --- |
+| `POST` | `/keys/` | Create API key | No |
+| `GET` | `/keys/` | Get current key metadata | Yes |
+| `DELETE` | `/keys/{key_id}` | Revoke current key | Yes |
+| `POST` | `/documents/sessions` | Create session | Yes |
+| `GET` | `/documents/sessions/{session_id}` | Get session info + ingestion status | Yes |
+| `GET` | `/documents/sessions/{session_id}/documents` | Paginated chunk list | Yes |
+| `DELETE` | `/documents/sessions/{session_id}` | Delete session | Yes |
+| `POST` | `/documents/upload/{session_id}` | Upload documents (async by default) | Yes |
+| `GET` | `/documents/supported-formats` | Supported upload formats | No |
+| `POST` | `/query/{session_id}` | Non-streaming query | Yes |
+| `POST` | `/query/stream/{session_id}` | Streaming query (SSE) | Yes |
+| `POST` | `/insights/feedback/{session_id}` | Submit answer feedback | Yes |
+| `GET` | `/insights/usage` | Usage + quota summary | Yes |
+| `GET` | `/insights/export/{session_id}` | Export chat history | Yes |
 
-### Typical Flow
+### Typical Flow (Async Upload)
 
 ```bash
-# 1. Get API key (do this once)
+# 1) Create key
 API_KEY=$(curl -s -X POST localhost:8000/api/v1/keys/ \
   -H "Content-Type: application/json" \
-  -d '{"name": "test"}' | jq -r '.api_key')
+  -d '{"name":"demo"}' | jq -r '.api_key')
 
-# 2. Create a session
+# 2) Create session
 SESSION=$(curl -s -X POST localhost:8000/api/v1/documents/sessions \
   -H "X-API-Key: $API_KEY" | jq -r '.session_id')
 
-# 3. Upload your document
+# 3) Upload (async_mode=true default)
 curl -X POST "localhost:8000/api/v1/documents/upload/$SESSION" \
   -H "X-API-Key: $API_KEY" \
-  -F "files=@quarterly-report.pdf"
+  -F "files=@report.pdf"
 
-# 4. Ask questions
+# 4) Poll session status until ingestion_status=ready
+curl -H "X-API-Key: $API_KEY" \
+  "localhost:8000/api/v1/documents/sessions/$SESSION"
+
+# 5) Query
 curl -X POST "localhost:8000/api/v1/query/$SESSION" \
   -H "X-API-Key: $API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"question": "What was the revenue growth?", "language": "en"}'
+  -d '{"question":"What is the revenue growth?","language":"en"}'
 ```
 
-**Swagger UI (Local):** http://localhost:8000/docs
+### Query Controls (Optional)
 
-**Swagger UI (Production):** https://mugnihidayah-synapse-rag-api.hf.space/docs
+Example payload with filters/debug:
+
+```json
+{
+  "question": "Summarize key risks",
+  "language": "en",
+  "top_k": 8,
+  "rerank_top_k": 3,
+  "include_debug": true,
+  "strict_grounding": true,
+  "enable_query_rewrite": true,
+  "filters": {
+    "sources": ["risk-report.pdf"],
+    "page_from": 2,
+    "page_to": 12,
+    "chunk_types": ["content"],
+    "content_origin": "text+ocr"
+  }
+}
+```
+
+### Upload Controls (Optional Query Params)
+
+- `async_mode` (default `true`)
+- `enable_ocr` (default from config)
+- `extract_tables` (default from config)
+
+Example:
+
+```bash
+curl -X POST "localhost:8000/api/v1/documents/upload/$SESSION?async_mode=false&enable_ocr=true&extract_tables=true" \
+  -H "X-API-Key: $API_KEY" \
+  -F "files=@scanned.pdf"
+```
 
 ---
 
 ## Rate Limits
 
-Limits are per API key:
+Per API key:
 
-| Endpoint type | Limit     |
-| ------------- | --------- |
-| Queries       | 50/minute |
-| Uploads       | 5/minute  |
-| Session ops   | 20/minute |
+- Query: `50/minute`
+- Upload: `5/minute`
+- Session operations: `20/minute`
 
-Hit the limit? You'll get `429 Too Many Requests`. Wait a minute and retry.
+Daily soft quota:
+
+- Query quota also tracked per day (`USAGE_DAILY_QUERY_QUOTA`, default `1000`).
 
 ---
 
-## Docker
+## Evaluation
+
+Lightweight eval harness:
 
 ```bash
-docker compose up -d        # Start everything
-docker compose logs -f api  # Watch API logs
-docker compose down         # Stop
+python scripts/eval/eval_harness.py --input scripts/eval/sample_predictions.jsonl
 ```
+
+Metrics:
+
+- `exact_match`
+- `token_f1`
+- `grounding_score`
+- `source_recall`
 
 ---
 
 ## Tech Stack
 
-**Backend:** FastAPI, SQLAlchemy, Pydantic, Uvicorn
-
-**Database:** PostgreSQL with pgvector extension
-
-**AI/ML:** LangChain, Groq LLM, HuggingFace embeddings (384-dim), Cohere Reranker
-
-**Search:** Hybrid retrieval (vector similarity + BM25 full-text), cross-encoder reranking
-
-**Auth & Security:** SHA256 key hashing, slowapi rate limiting
-
-**Logging:** structlog (JSON format)
-
-**DevOps:** Docker, GitHub Actions CI/CD, Hugging Face Spaces
-
----
-
-## Project Structure
-
-```
-synapse-instant-document-insight/
-├── src/
-│   ├── api/              # FastAPI app
-│   │   ├── routes/       # Endpoint handlers (documents, query, keys)
-│   │   ├── auth.py       # API key generation & validation
-│   │   ├── dependencies.py
-│   │   ├── rate_limiter.py
-│   │   ├── schemas.py    # Pydantic models
-│   │   └── main.py       # App factory
-│   ├── core/             # Shared utilities
-│   │   ├── config.py     # Settings (env vars)
-│   │   ├── exceptions.py
-│   │   └── logger.py     # Structured logging
-│   ├── db/               # Database layer
-│   │   ├── connection.py # Async engine & session
-│   │   └── models.py     # SQLAlchemy ORM models
-│   ├── ingestion/        # Document processing
-│   │   ├── loaders.py    # PDF, DOCX, TXT parsers
-│   │   ├── chunkers.py   # Text splitting
-│   │   └── pgvector_store.py  # Vector storage
-│   └── rag/              # AI/ML logic
-│       ├── chain.py      # LangChain RAG chain
-│       └── prompts.py    # System prompts (ID/EN)
-├── tests/                # Pytest test suite
-├── scripts/
-│   └── init.sql          # Database schema
-├── .github/workflows/    # CI/CD
-├── app.py                # Streamlit UI (optional)
-├── Dockerfile
-├── docker-compose.yml
-└── pyproject.toml
-```
+- Backend: FastAPI, SQLAlchemy, Pydantic, Uvicorn
+- Database: PostgreSQL + pgvector
+- AI/ML: LangChain, Groq LLM, HuggingFace embeddings, Cohere/local reranker
+- OCR: `rapidocr_onnxruntime` (RapidOCR)
+- Search: Hybrid retrieval + reranking + MMR
+- DevOps: Docker, GitHub Actions, Hugging Face Spaces
 
 ---
 
 ## Known Limitations
 
-- **File size:** Large files load into memory, no streaming upload yet
-- **Session expiry:** Sessions auto-delete after 24 hours
-- **Session isolation:** Sessions are not linked to API keys (no ownership check)
-- **No export:** Cannot export chat history as PDF/document
-- **Cold start:** First request may be slow on free-tier hosting due to model loading
+- Async ingestion uses in-process background tasks (no distributed worker yet).
+- Upload still buffers files in memory before processing.
+- OCR quality depends on scan quality and OCR runtime availability.
+- Sessions expire automatically after 24 hours.
+- Free-tier hosting can have cold starts.
 
 ---
 
 ## Development
 
 ```bash
-pytest tests/ -v --cov=src    # Run tests
-ruff check src/               # Lint
-mypy src/                     # Type check
+pytest tests/ -v --cov=src
+ruff check src/
+mypy src/
 ```
 
 ---
@@ -275,25 +243,50 @@ mypy src/                     # Type check
 ```env
 # Required
 GROQ_API_KEY=gsk_your_key
-DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/db
-COHERE_API_KEY=your_cohere_key
+DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/synapse_db
 
 # Optional
-HUGGINGFACE_TOKEN=hf_xxx      # For private models
-LOG_LEVEL=info                # debug, info, warning, error
-PORT=7860
+COHERE_API_KEY=
+HUGGINGFACE_TOKEN=
+RERANKER_PROVIDER=cohere
+LLM_MODEL=llama-3.3-70b-versatile
+EMBEDDING_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+RERANKER_MODEL=ms-marco-MiniLM-L-12-v2
+LOG_LEVEL=info
+PORT=8000
+DEBUG=false
+CACHE_DIR=./opt
+CHUNK_SIZE=1000
+CHUNK_OVERLAP=200
+
+# Retrieval / quality
+RETRIEVAL_TOP_K=10
+RETRIEVAL_FETCH_K=20
+DYNAMIC_TOP_K_MIN=4
+DYNAMIC_TOP_K_MAX=10
+RERANK_TOP_K=3
+USE_HYBRID_SEARCH=true
+HYBRID_VECTOR_WEIGHT=0.5
+HYBRID_KEYWORD_WEIGHT=0.5
+USE_MMR=true
+MMR_LAMBDA=0.7
+GROUNDEDNESS_THRESHOLD=0.15
+QUERY_REWRITE_ENABLED=true
+
+# Ingestion
+INGESTION_ASYNC_DEFAULT=true
+ENABLE_OCR=true
+ENABLE_TABLE_EXTRACTION=true
+MAX_UPLOAD_FILE_SIZE_MB=25
+
+# Analytics / export
+USAGE_DAILY_QUERY_QUOTA=1000
+EXPORT_MAX_MESSAGES=200
 ```
 
 ---
 
 ## License
 
-MIT — do whatever you want.
+MIT
 
----
-
-<div align="center">
-
-**Built with FastAPI, LangChain, PostgreSQL & Docker | Deployed on Hugging Face Spaces**
-
-</div>

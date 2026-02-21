@@ -1,9 +1,11 @@
 """
-PostgreSQL + pgvector vectorstore implementation
-Replace ChromaDB with persistent vector storage
+PostgreSQL + pgvector vectorstore implementation.
+
+Replace ChromaDB with persistent vector storage.
 """
 
 import uuid
+from typing import Any
 
 from langchain_core.documents import Document as LangchainDocument
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -13,10 +15,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.config import settings
 from src.core.exceptions import VectorStoreError
 from src.db.models import Document, Session
+from src.ingestion.metadata_filters import build_metadata_filter_clause
 
 
 def get_embedding_function() -> HuggingFaceEmbeddings:
-    """Get the embedding function for vectorization"""
+    """Get the embedding function for vectorization."""
     return HuggingFaceEmbeddings(
         model_name=settings.embedding_model,
         model_kwargs={"device": "cpu"},
@@ -24,12 +27,11 @@ def get_embedding_function() -> HuggingFaceEmbeddings:
     )
 
 
-# global embedding function (cached)
 _embedding_fn: HuggingFaceEmbeddings | None = None
 
 
 def get_embeddings() -> HuggingFaceEmbeddings:
-    """Get cached embedding function"""
+    """Get cached embedding function."""
     global _embedding_fn
     if _embedding_fn is None:
         _embedding_fn = get_embedding_function()
@@ -46,15 +48,6 @@ async def store_documents(
     Store documents with embeddings in PostgreSQL using batch processing.
 
     Processes documents in batches to reduce memory usage for large files.
-
-    Args:
-        db: Database session
-        session_id: Session ID
-        documents: List of Langchain documents
-        batch_size: Number of documents to process at once (default: 50)
-
-    Returns:
-        Number of documents stored
     """
     import gc
 
@@ -62,15 +55,11 @@ async def store_documents(
         embeddings = get_embeddings()
         total_stored = 0
 
-        # Process in batches to reduce memory usage
         for i in range(0, len(documents), batch_size):
             batch = documents[i : i + batch_size]
-
-            # Get embeddings for this batch only
             texts = [doc.page_content for doc in batch]
             vectors = embeddings.embed_documents(texts)
 
-            # Create document records for this batch
             db_documents = []
             for doc, vector in zip(batch, vectors, strict=True):
                 db_doc = Document(
@@ -85,21 +74,19 @@ async def store_documents(
             await db.flush()
             total_stored += len(db_documents)
 
-            # Free memory after each batch
             gc.collect()
 
-        # Update session document count
         session = await db.get(Session, session_id)
         if session:
             session.document_count += total_stored
 
         return total_stored
 
-    except Exception as e:
+    except Exception as exc:
         raise VectorStoreError(
             "Failed to store documents",
-            details={"error": str(e), "session_id": str(session_id)},
-        ) from e
+            details={"error": str(exc), "session_id": str(session_id)},
+        ) from exc
 
 
 async def similarity_search(
@@ -107,48 +94,36 @@ async def similarity_search(
     session_id: uuid.UUID,
     query: str,
     k: int = 5,
+    filters: dict[str, Any] | None = None,
 ) -> list[LangchainDocument]:
-    """
-    Find similar documents using pgvector cosine similarity
-
-    Args:
-        db: Database session
-        session_id: Session ID
-        query: Query text
-        k: Number of results to return
-
-    Returns:
-        List of similar Langchain documents
-    """
-
+    """Find similar documents using pgvector cosine similarity."""
     try:
         embeddings = get_embeddings()
-
-        # get query embedding
         query_vector = embeddings.embed_query(query)
 
+        filter_sql, filter_params = build_metadata_filter_clause(filters)
+
         stmt = text(
-            """
+            f"""
             SELECT id, content, metadata, embedding <=> :query_vector AS distance
             FROM documents
             WHERE session_id = :session_id
+            {filter_sql}
             ORDER BY embedding <=> :query_vector
             LIMIT :k
             """
         )
 
-        result = await db.execute(
-            stmt,
-            {
-                "query_vector": str(query_vector),
-                "session_id": str(session_id),
-                "k": k,
-            },
-        )
+        params: dict[str, Any] = {
+            "query_vector": str(query_vector),
+            "session_id": str(session_id),
+            "k": k,
+            **filter_params,
+        }
+        result = await db.execute(stmt, params)
 
         rows = result.fetchall()
 
-        # convert to langchain documents
         documents = []
         for row in rows:
             doc = LangchainDocument(
@@ -163,28 +138,18 @@ async def similarity_search(
 
         return documents
 
-    except Exception as e:
+    except Exception as exc:
         raise VectorStoreError(
             "Failed to perform similarity search",
-            details={"error": str(e), "session_id": str(session_id)},
-        ) from e
+            details={"error": str(exc), "session_id": str(session_id)},
+        ) from exc
 
 
 async def delete_session_documents(
     db: AsyncSession,
     session_id: uuid.UUID,
 ) -> int:
-    """
-    Delete all documents for a session
-
-    Args:
-        db: Database session
-        session_id: Session ID
-
-    Returns:
-        Number of documents deleted
-    """
-
+    """Delete all documents for a session."""
     try:
         stmt = select(Document).where(Document.session_id == session_id)
         result = await db.execute(stmt)
@@ -194,15 +159,14 @@ async def delete_session_documents(
         for doc in documents:
             await db.delete(doc)
 
-        # update session count
         session = await db.get(Session, session_id)
         if session:
             session.document_count = 0
 
         return count
 
-    except Exception as e:
+    except Exception as exc:
         raise VectorStoreError(
             "Failed to delete documents",
-            details={"error": str(e), "session_id": str(session_id)},
-        ) from e
+            details={"error": str(exc), "session_id": str(session_id)},
+        ) from exc

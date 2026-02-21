@@ -28,8 +28,11 @@ def _build_sources(docs: list[LangchainDocument]) -> list[dict]:
         sources.append(
             {
                 "text": doc.page_content,
+                "snippet": doc.page_content[:80],
                 "score": round(score, 4),
                 "chunk_id": chunk_id,
+                "source": meta.get("source"),
+                "page": meta.get("page"),
                 "metadata": meta,
             }
         )
@@ -138,6 +141,9 @@ class TestBuildSources:
         assert "text" in src
         assert "score" in src
         assert "chunk_id" in src
+        assert "snippet" in src
+        assert "source" in src
+        assert "page" in src
         assert "metadata" in src
         assert isinstance(src["score"], float)
         assert isinstance(src["chunk_id"], str)

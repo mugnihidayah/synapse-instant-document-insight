@@ -1,88 +1,62 @@
 """
-Document loaders for various formats
+Document loaders for various formats.
 
-Supports PDF, DOCX, TXT files and images (PNG, JPG, JPEG, WEBP) via OCR
+Supports PDF, DOCX, TXT files and images (PNG, JPG, JPEG, WEBP) via OCR.
 """
 
+import io
 import os
 import tempfile
 from pathlib import Path
 from typing import Any
 
 import fitz  # PyMuPDF
-from langchain_community.document_loaders import (
-    Docx2txtLoader,
-    PyMuPDFLoader,
-    TextLoader,
-)
+from langchain_community.document_loaders import Docx2txtLoader, PyMuPDFLoader, TextLoader
 from langchain_core.documents import Document
 from PIL import Image
 
 from src.core.exceptions import DocumentProcessingError
 
-# mapping of file extensions to loader classes
 LOADER_MAPPING: dict[str, type] = {
     ".pdf": PyMuPDFLoader,
     ".docx": Docx2txtLoader,
     ".txt": TextLoader,
 }
 
-# Image extensions handled via OCR
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 
-# Global OCR reader (lazy-loaded)
-_ocr_reader = None
+_ocr_engine = None
 
 
-def _get_ocr_reader():
-    """Get cached easyocr reader instance."""
-    global _ocr_reader
-    if _ocr_reader is None:
-        import easyocr
+def _get_ocr_engine():
+    """Get cached RapidOCR engine instance."""
+    global _ocr_engine
+    if _ocr_engine is None:
+        from rapidocr_onnxruntime import RapidOCR
 
-        _ocr_reader = easyocr.Reader(["en", "id"], gpu=False)
-    return _ocr_reader
+        _ocr_engine = RapidOCR()
+    return _ocr_engine
 
 
 def get_supported_extensions() -> list[str]:
-    """
-    Get list of supported file extensions
-
-    Returns:
-      List of extension strings
-    """
+    """Get list of supported file extensions."""
     return list(LOADER_MAPPING.keys()) + list(IMAGE_EXTENSIONS)
 
 
 def _ocr_image(image: Image.Image) -> str:
-    """
-    Extract text from a PIL Image using easyocr.
-
-    Args:
-        image: PIL Image object
-
-    Returns:
-        Extracted text string
-    """
+    """Extract text from a PIL Image using RapidOCR."""
     import numpy as np
 
-    reader = _get_ocr_reader()
-    # easyocr accepts numpy array
+    engine = _get_ocr_engine()
     img_array = np.array(image.convert("RGB"))
-    results = reader.readtext(img_array, detail=0, paragraph=True)
-    return "\n".join(results)
+    result, _ = engine(img_array)
+    if not result:
+        return ""
+    return "\n".join(item[1] for item in result)
 
 
 def _extract_pdf_image_text(pdf_path: str) -> dict[int, str]:
-    """
-    Extract text from embedded images in a PDF via OCR.
-
-    Args:
-        pdf_path: Path to PDF file
-
-    Returns:
-        Dict mapping page index to OCR text from embedded images
-    """
+    """Extract OCR text from embedded images in a PDF."""
     ocr_texts: dict[int, str] = {}
 
     try:
@@ -90,7 +64,6 @@ def _extract_pdf_image_text(pdf_path: str) -> dict[int, str]:
         for page_idx in range(len(pdf_doc)):
             page = pdf_doc[page_idx]
             images = page.get_images(full=True)
-
             if not images:
                 continue
 
@@ -100,12 +73,8 @@ def _extract_pdf_image_text(pdf_path: str) -> dict[int, str]:
                 try:
                     base_image = pdf_doc.extract_image(xref)
                     image_bytes = base_image["image"]
-
-                    import io
-
                     pil_image = Image.open(io.BytesIO(image_bytes))
 
-                    # Skip tiny images (icons, bullets, etc.)
                     if pil_image.width < 50 or pil_image.height < 50:
                         continue
 
@@ -120,25 +89,50 @@ def _extract_pdf_image_text(pdf_path: str) -> dict[int, str]:
 
         pdf_doc.close()
     except Exception:
-        pass  # If image extraction fails, we still have the regular text
+        pass
 
     return ocr_texts
 
 
+def _extract_pdf_table_text(pdf_path: str) -> dict[int, str]:
+    """Extract basic table text from PDF pages if table detector is available."""
+    table_texts: dict[int, str] = {}
+
+    try:
+        pdf_doc = fitz.open(pdf_path)
+        for page_idx in range(len(pdf_doc)):
+            page = pdf_doc[page_idx]
+            if not hasattr(page, "find_tables"):
+                continue
+
+            try:
+                tables = page.find_tables()
+            except Exception:
+                continue
+
+            if not tables or not tables.tables:
+                continue
+
+            page_tables: list[str] = []
+            for table in tables.tables:
+                rows = table.extract()
+                row_lines = [" | ".join((cell or "").strip() for cell in row) for row in rows]
+                serialized = "\n".join(row_lines).strip()
+                if serialized:
+                    page_tables.append(serialized)
+
+            if page_tables:
+                table_texts[page_idx] = "\n\n".join(page_tables)
+
+        pdf_doc.close()
+    except Exception:
+        pass
+
+    return table_texts
+
+
 def load_document_from_path(file_path: str | Path) -> list[Document]:
-    """
-    Load document from file path
-
-    Args:
-      file_path: Path to document file
-
-    Returns:
-      List of langchain documents
-
-    Raises:
-      DocumentProcessingError: If file extension is not supported or loading fails
-    """
-
+    """Load document from file path."""
     file_path = Path(file_path)
 
     if not file_path.exists():
@@ -164,21 +158,25 @@ def load_document_from_path(file_path: str | Path) -> list[Document]:
     return documents
 
 
-def load_document_from_upload(uploaded_file: Any, filename: str) -> list[Document]:
+def load_document_from_upload(
+    uploaded_file: Any,
+    filename: str,
+    *,
+    enable_ocr: bool = True,
+    extract_tables: bool = False,
+) -> list[Document]:
     """
-    Load document from uploaded file
+    Load document from uploaded file.
 
     Args:
-      uploaded_file: file like object
-      filename: original filename
+      uploaded_file: File-like object
+      filename: Original filename
+      enable_ocr: Enable OCR for image/PDF image content
+      extract_tables: Enable lightweight PDF table extraction
 
     Returns:
-      List of langchain documents
-
-    Raises:
-      DocumentProcessingError: If file extension is not supported or loading fails
+      List of LangChain documents
     """
-
     ext = os.path.splitext(filename)[1].lower()
 
     all_supported = set(LOADER_MAPPING.keys()) | IMAGE_EXTENSIONS
@@ -188,13 +186,12 @@ def load_document_from_upload(uploaded_file: Any, filename: str) -> list[Documen
             details={"filename": filename, "supported": get_supported_extensions()},
         )
 
-    # Handle image files via OCR
     if ext in IMAGE_EXTENSIONS:
-        return _load_image_from_upload(uploaded_file, filename, ext)
+        return _load_image_from_upload(uploaded_file, filename, ext, enable_ocr=enable_ocr)
 
-    # Handle document files (PDF, DOCX, TXT)
-    # save to temp file for processing
     with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+        if hasattr(uploaded_file, "seek"):
+            uploaded_file.seek(0)
         tmp.write(uploaded_file.read())
         tmp_path = tmp.name
 
@@ -203,7 +200,6 @@ def load_document_from_upload(uploaded_file: Any, filename: str) -> list[Documen
         loader = loader_class(tmp_path)
         documents: list[Document] = loader.load()
 
-        # update metadata with original filename and document info
         total_pages = len(documents)
         for doc in documents:
             doc.metadata["source"] = filename
@@ -213,8 +209,7 @@ def load_document_from_upload(uploaded_file: Any, filename: str) -> list[Documen
             if "page" in doc.metadata:
                 doc.metadata["page"] = doc.metadata["page"] + 1
 
-        # For PDFs: extract text from embedded images via OCR
-        if ext == ".pdf":
+        if ext == ".pdf" and enable_ocr:
             ocr_texts = _extract_pdf_image_text(tmp_path)
             for page_idx, ocr_text in ocr_texts.items():
                 if page_idx < len(documents):
@@ -222,30 +217,45 @@ def load_document_from_upload(uploaded_file: Any, filename: str) -> list[Documen
                     documents[page_idx].metadata["has_ocr"] = True
                     documents[page_idx].metadata["content_origin"] = "text+ocr"
 
+        if ext == ".pdf" and extract_tables:
+            table_texts = _extract_pdf_table_text(tmp_path)
+            for page_idx, table_text in table_texts.items():
+                if page_idx < len(documents):
+                    documents[page_idx].page_content += f"\n\n[Extracted table]\n{table_text}"
+                    documents[page_idx].metadata["has_tables"] = True
+                    existing = documents[page_idx].metadata.get("content_origin", "text")
+                    if "table" not in existing:
+                        documents[page_idx].metadata["content_origin"] = f"{existing}+table"
+
         return documents
+
     except Exception as e:
         raise DocumentProcessingError(
-            "Failed to load uploaded document", details={"filename": filename, "error": str(e)}
+            "Failed to load uploaded document",
+            details={"filename": filename, "error": str(e)},
         ) from e
 
     finally:
-        # clean up temp file
         os.unlink(tmp_path)
 
 
-def _load_image_from_upload(uploaded_file: Any, filename: str, ext: str) -> list[Document]:
-    """
-    Load image file and extract text via OCR.
+def _load_image_from_upload(
+    uploaded_file: Any,
+    filename: str,
+    ext: str,
+    *,
+    enable_ocr: bool = True,
+) -> list[Document]:
+    """Load image file and extract text via OCR."""
+    if not enable_ocr:
+        raise DocumentProcessingError(
+            "OCR is disabled for image uploads",
+            details={"filename": filename, "extension": ext},
+        )
 
-    Args:
-        uploaded_file: file-like object
-        filename: original filename
-        ext: file extension (e.g. ".png")
-
-    Returns:
-        List with single Document containing OCR-extracted text
-    """
     try:
+        if hasattr(uploaded_file, "seek"):
+            uploaded_file.seek(0)
         pil_image = Image.open(uploaded_file)
         text = _ocr_image(pil_image)
 
@@ -275,15 +285,7 @@ def _load_image_from_upload(uploaded_file: Any, filename: str, ext: str) -> list
 
 
 def load_documents_from_uploads(uploaded_files: list) -> list[Document]:
-    """
-    Load multiple documents from uploaded files
-
-    Args:
-      uploaded_files: list of uploaded files
-
-    Returns:
-      Combined list of langchain documents
-    """
+    """Load multiple documents from uploaded files."""
     all_documents: list[Document] = []
 
     for uploaded_file in uploaded_files:
