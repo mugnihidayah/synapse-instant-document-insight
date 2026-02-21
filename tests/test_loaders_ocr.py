@@ -5,8 +5,7 @@ import os
 import tempfile
 
 import fitz  # PyMuPDF
-import numpy as np
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
 from src.ingestion.loaders import (
     IMAGE_EXTENSIONS,
@@ -129,12 +128,10 @@ class TestPDFWithImages:
         page.insert_image(rect, stream=img_bytes.getvalue())
 
         # Save PDF
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-        pdf.save(tmp.name)
-        pdf.close()
-        tmp.close()
-
-        return tmp.name
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            pdf.save(tmp.name)
+            pdf.close()
+            return tmp.name
 
     def test_extract_pdf_image_text(self):
         """Should extract OCR text from images embedded in PDF."""

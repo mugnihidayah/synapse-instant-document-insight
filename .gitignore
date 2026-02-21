@@ -40,3 +40,5 @@ data/
 opt/
 *.db
 chroma_db/
+# Agent workflows
+.agent/

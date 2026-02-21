@@ -9,7 +9,6 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-import easyocr
 import fitz  # PyMuPDF
 from langchain_community.document_loaders import (
     Docx2txtLoader,
@@ -32,13 +31,15 @@ LOADER_MAPPING: dict[str, type] = {
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 
 # Global OCR reader (lazy-loaded)
-_ocr_reader: easyocr.Reader | None = None
+_ocr_reader = None
 
 
-def _get_ocr_reader() -> easyocr.Reader:
+def _get_ocr_reader():
     """Get cached easyocr reader instance."""
     global _ocr_reader
     if _ocr_reader is None:
+        import easyocr
+
         _ocr_reader = easyocr.Reader(["en", "id"], gpu=False)
     return _ocr_reader
 
