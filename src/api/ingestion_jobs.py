@@ -138,8 +138,8 @@ async def _run_ingestion_job(
                 session_id,
                 "failed",
                 error=format_ingestion_error(CODE_INGESTION_INTERNAL_ERROR, message),
-                summary=summary, # type: ignore
-                warnings=warnings, # type: ignore
-                file_results=initial_file_results, # type: ignore
+                summary=summary,  # type: ignore
+                warnings=warnings,  # type: ignore
+                file_results=initial_file_results,  # type: ignore
                 error_code=CODE_INGESTION_INTERNAL_ERROR,
             )
