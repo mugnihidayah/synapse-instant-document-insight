@@ -25,7 +25,7 @@ API Docs: [mugnihidayah-synapse-rag-api.hf.space/docs](https://mugnihidayah-syna
 ## Features
 
 - Multimodal ingestion: `PDF`, `DOCX`, `TXT`, image files (`PNG/JPG/JPEG/WEBP`) with OCR.
-- Async ingestion pipeline: upload queue with status (`queued`, `processing`, `ready`, `failed`).
+- Async ingestion pipeline: upload queue with status (`queued`, `processing`, `ready`, `ready_with_warnings`, `failed`).
 - Retrieval upgrades: hybrid search (vector + keyword), reranking, dynamic `top_k`, MMR diversification.
 - Query quality: contextualization, query rewrite, strict grounding guardrail, richer citations.
 - Metadata filters at query time: by source, page range, chunk type, content origin.
@@ -186,6 +186,16 @@ curl -X POST "localhost:8000/api/v1/documents/upload/$SESSION?async_mode=false&e
   -F "files=@scanned.pdf"
 ```
 
+### Ingestion
+
+Ingestion now returns structured, per-file outcomes so clients can handle warnings and errors without parsing raw error strings.
+
+- Upload (`POST /documents/upload/{session_id}`) includes `summary` and `file_results[]`.
+- Session info (`GET /documents/sessions/{id}`) includes `ingestion_summary` and `ingestion_warnings[]`.
+- Existing `ingestion_error` is preserved for backward compatibility.
+- Supported ingestion statuses: `queued`, `processing`, `ready`, `ready_with_warnings`, `failed`.
+- Full schema details are available in `/docs` (OpenAPI).
+
 ---
 
 ## Rate Limits
@@ -303,4 +313,3 @@ EXPORT_MAX_MESSAGES=200
 ## License
 
 MIT
-

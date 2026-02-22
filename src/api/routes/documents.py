@@ -1,6 +1,5 @@
 """Document upload and management endpoints."""
 
-import io
 import uuid
 from typing import Annotated
 
@@ -12,10 +11,30 @@ from starlette.requests import Request
 
 from src.api import session as session_service
 from src.api.dependencies import get_api_key
-from src.api.ingestion_jobs import UploadFilePayload, schedule_ingestion_job
+from src.api.ingestion_contract import (
+    CODE_FILE_TOO_LARGE,
+    CODE_INGESTION_INTERNAL_ERROR,
+    CODE_UNSUPPORTED_FORMAT,
+    FileIngestionResultData,
+    IngestionSummaryData,
+    IngestionWarningData,
+    UploadFilePayload,
+    build_file_result,
+    build_ingestion_message,
+    build_ingestion_warnings,
+    format_ingestion_error,
+    log_file_result,
+    process_and_store_payloads,
+    resolve_session_error_code,
+    summarize_file_results,
+)
+from src.api.ingestion_jobs import schedule_ingestion_job
 from src.api.rate_limiter import RATE_LIMIT_SESSION, RATE_LIMIT_UPLOAD, limiter
 from src.api.schemas import (
     DocumentUploadResponse,
+    FileIngestionResult,
+    IngestionSummary,
+    IngestionWarning,
     SessionCreate,
     SessionDocumentItem,
     SessionDocumentsResponse,
@@ -23,18 +42,52 @@ from src.api.schemas import (
 )
 from src.api.usage import record_usage_event
 from src.core.config import settings
-from src.core.exceptions import DocumentProcessingError, VectorStoreError
 from src.core.logger import get_logger
 from src.db import get_db
 from src.db.models import APIKey
-from src.ingestion.chunkers import extract_document_header, split_documents
 from src.ingestion.file_storage import resolve_original_file_path, save_original_file
-from src.ingestion.loaders import get_supported_extensions, load_document_from_upload
-from src.ingestion.pgvector_store import store_documents
+from src.ingestion.loaders import get_supported_extensions
 
 logger = get_logger(__name__)
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
+
+
+def _to_summary_model(summary: IngestionSummaryData) -> IngestionSummary:
+    return IngestionSummary(**summary)
+
+
+def _to_warning_models(warnings: list[IngestionWarningData]) -> list[IngestionWarning]:
+    return [IngestionWarning(**warning) for warning in warnings]
+
+
+def _to_file_result_models(
+    file_results: list[FileIngestionResultData],
+) -> list[FileIngestionResult]:
+    return [FileIngestionResult(**result) for result in file_results]
+
+
+def _build_upload_response(
+    *,
+    session_id: str,
+    document_processed: int = 0,
+    chunks_created: int = 0,
+    files_queued: int = 0,
+    ingestion_status: str = "queued",
+    message: str = "Documents accepted for processing",
+    summary: IngestionSummaryData,
+    file_results: list[FileIngestionResultData],
+) -> DocumentUploadResponse:
+    return DocumentUploadResponse(
+        session_id=session_id,
+        document_processed=document_processed,
+        chunks_created=chunks_created,
+        files_queued=files_queued,
+        ingestion_status=ingestion_status,
+        message=message,
+        summary=_to_summary_model(summary),
+        file_results=_to_file_result_models(file_results),
+    )
 
 
 @router.post("/sessions", response_model=SessionCreate)
@@ -77,9 +130,12 @@ async def get_session_info(
         session_id=str(session.id),
         created_at=session.created_at,
         document_count=session.document_count,
-        is_ready=session.document_count > 0 and session.ingestion_status == "ready",
+        is_ready=session.document_count > 0
+        and session.ingestion_status in {"ready", "ready_with_warnings"},
         ingestion_status=session.ingestion_status,
         ingestion_error=session.ingestion_error,
+        ingestion_summary=_to_summary_model(session_service.get_ingestion_summary(session)),
+        ingestion_warnings=_to_warning_models(session_service.get_ingestion_warnings(session)),
         ingestion_started_at=session.ingestion_started_at,
         ingestion_completed_at=session.ingestion_completed_at,
     )
@@ -291,41 +347,42 @@ async def _process_documents_sync(
     db: AsyncSession,
     session_id: uuid.UUID,
     payloads: list[UploadFilePayload],
+    total_files: int,
+    initial_file_results: list[FileIngestionResultData],
     *,
     enable_ocr: bool,
     extract_tables: bool,
-) -> tuple[int, int]:
+) -> tuple[
+    int,
+    int,
+    str,
+    str,
+    IngestionSummaryData,
+    list[FileIngestionResultData],
+    list[IngestionWarningData],
+    str | None,
+]:
     """Synchronous upload path used when async_mode=false."""
-    all_documents = []
-
-    for payload in payloads:
-        document_metadata = {
-            "document_id": payload["document_id"],
-            "original_filename": payload["filename"],
-            "file_path": payload["file_path"],
-            "mime_type": payload["mime_type"],
-            "file_size_bytes": payload["file_size_bytes"],
-        }
-        docs = load_document_from_upload(
-            io.BytesIO(payload["content"]),
-            payload["filename"],
-            enable_ocr=enable_ocr,
-            extract_tables=extract_tables,
-            document_metadata=document_metadata,
-        )
-        all_documents.extend(docs)
-
-    if not all_documents:
-        raise DocumentProcessingError("No content extracted from files")
-
-    header_chunk = extract_document_header(all_documents)
-    chunks = split_documents(all_documents)
-
-    if header_chunk:
-        chunks.insert(0, header_chunk)
-
-    stored_count = await store_documents(db, session_id, chunks)
-    return len(all_documents), stored_count
+    result = await process_and_store_payloads(
+        db=db,
+        session_id=session_id,
+        payloads=payloads,
+        total_files=total_files,
+        enable_ocr=enable_ocr,
+        extract_tables=extract_tables,
+        logger=logger,
+        initial_file_results=initial_file_results,
+    )
+    return (
+        result.document_processed,
+        result.chunks_created,
+        result.ingestion_status,
+        result.message,
+        result.summary,
+        result.file_results,
+        result.warnings,
+        result.error_code,
+    )
 
 
 @router.post("/upload/{session_id}", response_model=DocumentUploadResponse)
@@ -367,30 +424,55 @@ async def upload_documents(
             detail="No files uploaded",
         )
 
-    supported = get_supported_extensions()
+    supported = set(get_supported_extensions())
     max_bytes = settings.max_upload_file_size_mb * 1024 * 1024
 
     payloads: list[UploadFilePayload] = []
+    initial_file_results: list[FileIngestionResultData] = []
     for file in files:
+        mime_type = file.content_type or "application/octet-stream"
         if file.filename is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="File must have a filename",
+            item = build_file_result(
+                filename="unnamed",
+                mime_type=mime_type,
+                status="failed",
+                error_code=CODE_INGESTION_INTERNAL_ERROR,
+                severity="error",
+                message="File must have a filename",
             )
+            initial_file_results.append(item)
+            log_file_result(logger, session_id=str(session.id), file_result=item)
+            continue
 
-        ext = "." + file.filename.split(".")[-1].lower()
+        ext = "." + file.filename.split(".")[-1].lower() if "." in file.filename else ""
         if ext not in supported:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unsupported file type: {ext}",
+            item = build_file_result(
+                filename=file.filename,
+                mime_type=mime_type,
+                status="failed",
+                error_code=CODE_UNSUPPORTED_FORMAT,
+                severity="error",
+                message=f"Unsupported file type: {ext or 'unknown'}",
             )
+            initial_file_results.append(item)
+            log_file_result(logger, session_id=str(session.id), file_result=item)
+            continue
 
         content = await file.read()
         if len(content) > max_bytes:
-            raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail=f"File {file.filename} exceeds {settings.max_upload_file_size_mb}MB limit",
+            item = build_file_result(
+                filename=file.filename,
+                mime_type=mime_type,
+                status="failed",
+                error_code=CODE_FILE_TOO_LARGE,
+                severity="error",
+                message=(
+                    f"File {file.filename} exceeds {settings.max_upload_file_size_mb}MB limit"
+                ),
             )
+            initial_file_results.append(item)
+            log_file_result(logger, session_id=str(session.id), file_result=item)
+            continue
 
         try:
             stored_file = save_original_file(
@@ -400,10 +482,17 @@ async def upload_documents(
             )
         except Exception as exc:
             logger.error("upload_file_persist_failed", filename=file.filename, error=str(exc))
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to persist uploaded file {file.filename}",
-            ) from exc
+            item = build_file_result(
+                filename=file.filename,
+                mime_type=mime_type,
+                status="failed",
+                error_code=CODE_INGESTION_INTERNAL_ERROR,
+                severity="error",
+                message=f"Failed to persist uploaded file {file.filename}",
+            )
+            initial_file_results.append(item)
+            log_file_result(logger, session_id=str(session.id), file_result=item)
+            continue
 
         payloads.append(
             UploadFilePayload(
@@ -416,21 +505,59 @@ async def upload_documents(
             )
         )
 
+    total_files = len(files)
+    queued_summary = summarize_file_results(
+        total_files=total_files,
+        file_results=initial_file_results,
+    )
+    queued_warnings = build_ingestion_warnings(initial_file_results)
+
     if not payloads:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No content extracted from files",
+        error_code = resolve_session_error_code(
+            summary=queued_summary,
+            file_results=initial_file_results,
+        )
+        message = build_ingestion_message("failed", error_code)
+        await session_service.set_ingestion_status(
+            db,
+            session.id,
+            "failed",
+            error=format_ingestion_error(error_code, message),
+            summary=queued_summary,
+            warnings=queued_warnings,
+            file_results=initial_file_results,
+            error_code=error_code,
+        )
+        return _build_upload_response(
+            session_id=session_id,
+            document_processed=0,
+            chunks_created=0,
+            files_queued=0,
+            ingestion_status="failed",
+            message=message,
+            summary=queued_summary,
+            file_results=initial_file_results,
         )
 
     ocr_enabled = settings.enable_ocr if enable_ocr is None else enable_ocr
     table_enabled = settings.enable_table_extraction if extract_tables is None else extract_tables
 
-    await session_service.set_ingestion_status(db, session.id, "queued")
+    await session_service.set_ingestion_status(
+        db,
+        session.id,
+        "queued",
+        summary=queued_summary,
+        warnings=queued_warnings,
+        file_results=initial_file_results,
+        error_code=None,
+    )
 
     if async_mode:
         job_id = schedule_ingestion_job(
             session.id,
             payloads,
+            total_files=total_files,
+            initial_file_results=initial_file_results,
             enable_ocr=ocr_enabled,
             extract_tables=table_enabled,
         )
@@ -442,13 +569,14 @@ async def upload_documents(
             session_id=session.id,
             metadata={
                 "job_id": job_id,
+                "total_files": total_files,
                 "files": len(payloads),
                 "ocr_enabled": ocr_enabled,
                 "table_extraction_enabled": table_enabled,
             },
         )
 
-        return DocumentUploadResponse(
+        return _build_upload_response(
             session_id=session_id,
             files_queued=len(payloads),
             ingestion_status="queued",
@@ -456,61 +584,111 @@ async def upload_documents(
                 "Documents accepted for background processing. "
                 f"Use /documents/sessions/{session_id} to track status. job_id={job_id}"
             ),
+            summary=queued_summary,
+            file_results=initial_file_results,
         )
 
     try:
-        await session_service.set_ingestion_status(db, session.id, "processing")
-        docs_count, chunk_count = await _process_documents_sync(
+        await session_service.set_ingestion_status(
+            db,
+            session.id,
+            "processing",
+            summary=queued_summary,
+            warnings=queued_warnings,
+            file_results=initial_file_results,
+            error_code=None,
+        )
+        (
+            docs_count,
+            chunk_count,
+            ingestion_status,
+            message,
+            summary,
+            file_results,
+            warnings,
+            error_code,
+        ) = await _process_documents_sync(
             db,
             session.id,
             payloads,
+            total_files=total_files,
+            initial_file_results=initial_file_results,
             enable_ocr=ocr_enabled,
             extract_tables=table_enabled,
         )
 
-        await session_service.set_ingestion_status(db, session.id, "ready")
-        await record_usage_event(
+        await session_service.set_ingestion_status(
             db,
-            api_key.id,
-            "upload",
-            session_id=session.id,
-            metadata={
-                "files": len(payloads),
-                "documents": docs_count,
-                "chunks": chunk_count,
-                "ocr_enabled": ocr_enabled,
-                "table_extraction_enabled": table_enabled,
-            },
+            session.id,
+            ingestion_status,
+            error=(
+                format_ingestion_error(error_code, message)
+                if ingestion_status == "failed"
+                else None
+            ),
+            summary=summary,
+            warnings=warnings,
+            file_results=file_results,
+            error_code=error_code,
         )
+        if ingestion_status in {"ready", "ready_with_warnings"}:
+            await record_usage_event(
+                db,
+                api_key.id,
+                "upload",
+                session_id=session.id,
+                metadata={
+                    "files": len(payloads),
+                    "documents": docs_count,
+                    "chunks": chunk_count,
+                    "ocr_enabled": ocr_enabled,
+                    "table_extraction_enabled": table_enabled,
+                },
+            )
 
         logger.info(
             "upload_completed",
             session_id=session_id,
             chunks_created=chunk_count,
+            ingestion_status=ingestion_status,
         )
 
-        return DocumentUploadResponse(
+        return _build_upload_response(
             session_id=session_id,
             document_processed=docs_count,
             chunks_created=chunk_count,
             files_queued=0,
-            ingestion_status="ready",
-            message="Documents processed successfully",
+            ingestion_status=ingestion_status,
+            message=message,
+            summary=summary,
+            file_results=file_results,
         )
-
-    except DocumentProcessingError as exc:
-        await session_service.set_ingestion_status(db, session.id, "failed", error=str(exc))
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-
-    except VectorStoreError as exc:
-        await session_service.set_ingestion_status(db, session.id, "failed", error=str(exc))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(exc),
-        ) from exc
+    except Exception as exc:
+        logger.error("upload_processing_failed", session_id=session_id, error=str(exc))
+        summary = summarize_file_results(total_files=total_files, file_results=initial_file_results)
+        warnings = build_ingestion_warnings(initial_file_results)
+        error_code = CODE_INGESTION_INTERNAL_ERROR
+        message = build_ingestion_message("failed", error_code)
+        await session_service.set_ingestion_status(
+            db,
+            session.id,
+            "failed",
+            error=format_ingestion_error(error_code, message),
+            summary=summary,
+            warnings=warnings,
+            file_results=initial_file_results,
+            error_code=error_code,
+        )
+        return _build_upload_response(
+            session_id=session_id,
+            document_processed=0,
+            chunks_created=0,
+            files_queued=0,
+            ingestion_status="failed",
+            message=message,
+            summary=summary,
+            file_results=initial_file_results,
+        )
 
 
 @router.get("/supported-formats")

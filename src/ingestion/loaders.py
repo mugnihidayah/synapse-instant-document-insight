@@ -27,14 +27,29 @@ IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 
 _ocr_engine = None
 
+ERROR_CODE_OCR_NO_TEXT = "OCR_NO_TEXT"
+ERROR_CODE_UNSUPPORTED_FORMAT = "UNSUPPORTED_FORMAT"
+ERROR_CODE_OCR_ENGINE_UNAVAILABLE = "OCR_ENGINE_UNAVAILABLE"
+ERROR_CODE_INGESTION_INTERNAL_ERROR = "INGESTION_INTERNAL_ERROR"
+
 
 def _get_ocr_engine():
     """Get cached RapidOCR engine instance."""
     global _ocr_engine
     if _ocr_engine is None:
-        from rapidocr_onnxruntime import RapidOCR
+        try:
+            from rapidocr_onnxruntime import RapidOCR
 
-        _ocr_engine = RapidOCR()
+            _ocr_engine = RapidOCR()
+        except Exception as exc:
+            raise DocumentProcessingError(
+                "OCR engine unavailable",
+                details={
+                    "error_code": ERROR_CODE_OCR_ENGINE_UNAVAILABLE,
+                    "severity": "error",
+                    "error": str(exc),
+                },
+            ) from exc
     return _ocr_engine
 
 
@@ -142,7 +157,12 @@ def load_document_from_path(file_path: str | Path) -> list[Document]:
     if ext not in LOADER_MAPPING:
         raise DocumentProcessingError(
             "Unsupported file format",
-            details={"extension": ext, "supported_extensions": get_supported_extensions()},
+            details={
+                "extension": ext,
+                "supported_extensions": get_supported_extensions(),
+                "error_code": ERROR_CODE_UNSUPPORTED_FORMAT,
+                "severity": "error",
+            },
         )
 
     loader_class = LOADER_MAPPING[ext]
@@ -152,7 +172,13 @@ def load_document_from_path(file_path: str | Path) -> list[Document]:
         documents: list[Document] = loader.load()
     except Exception as e:
         raise DocumentProcessingError(
-            "Failed to load document", details={"path": str(file_path), "error": str(e)}
+            "Failed to load document",
+            details={
+                "path": str(file_path),
+                "error": str(e),
+                "error_code": ERROR_CODE_INGESTION_INTERNAL_ERROR,
+                "severity": "error",
+            },
         ) from e
 
     return documents
@@ -184,7 +210,12 @@ def load_document_from_upload(
     if ext not in all_supported:
         raise DocumentProcessingError(
             "Unsupported file format",
-            details={"filename": filename, "supported": get_supported_extensions()},
+            details={
+                "filename": filename,
+                "supported": get_supported_extensions(),
+                "error_code": ERROR_CODE_UNSUPPORTED_FORMAT,
+                "severity": "error",
+            },
         )
 
     if ext in IMAGE_EXTENSIONS:
@@ -241,7 +272,12 @@ def load_document_from_upload(
     except Exception as e:
         raise DocumentProcessingError(
             "Failed to load uploaded document",
-            details={"filename": filename, "error": str(e)},
+            details={
+                "filename": filename,
+                "error": str(e),
+                "error_code": ERROR_CODE_INGESTION_INTERNAL_ERROR,
+                "severity": "error",
+            },
         ) from e
 
     finally:
@@ -259,8 +295,13 @@ def _load_image_from_upload(
     """Load image file and extract text via OCR."""
     if not enable_ocr:
         raise DocumentProcessingError(
-            "OCR is disabled for image uploads",
-            details={"filename": filename, "extension": ext},
+            "OCR engine unavailable",
+            details={
+                "filename": filename,
+                "extension": ext,
+                "error_code": ERROR_CODE_OCR_ENGINE_UNAVAILABLE,
+                "severity": "error",
+            },
         )
 
     try:
@@ -272,7 +313,11 @@ def _load_image_from_upload(
         if not text.strip():
             raise DocumentProcessingError(
                 "No text could be extracted from image",
-                details={"filename": filename},
+                details={
+                    "filename": filename,
+                    "error_code": ERROR_CODE_OCR_NO_TEXT,
+                    "severity": "warning",
+                },
             )
 
         return [
@@ -291,7 +336,13 @@ def _load_image_from_upload(
         raise
     except Exception as e:
         raise DocumentProcessingError(
-            "Failed to process image", details={"filename": filename, "error": str(e)}
+            "Failed to process image",
+            details={
+                "filename": filename,
+                "error": str(e),
+                "error_code": ERROR_CODE_INGESTION_INTERNAL_ERROR,
+                "severity": "error",
+            },
         ) from e
 
 

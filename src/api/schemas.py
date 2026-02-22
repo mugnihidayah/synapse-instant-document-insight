@@ -1,8 +1,39 @@
 """Pydantic schemas for API request/response validation"""
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
+
+
+class IngestionSummary(BaseModel):
+    """Aggregated ingestion counters."""
+
+    total_files: int = 0
+    processed_files: int = 0
+    warning_files: int = 0
+    failed_files: int = 0
+
+
+class IngestionWarning(BaseModel):
+    """Warning item returned at session level."""
+
+    code: str
+    message: str
+    filename: str | None = None
+
+
+class FileIngestionResult(BaseModel):
+    """Per-file ingestion outcome."""
+
+    filename: str
+    mime_type: str
+    status: Literal["processed", "warning", "failed"]
+    error_code: str | None = None
+    severity: Literal["warning", "error"] | None = None
+    message: str | None = None
+    document_id: str | None = None
+    chunks_created: int | None = None
 
 
 # SESSION SCHEMAS
@@ -22,6 +53,8 @@ class SessionInfo(BaseModel):
     is_ready: bool
     ingestion_status: str = "idle"
     ingestion_error: str | None = None
+    ingestion_summary: IngestionSummary = Field(default_factory=IngestionSummary)
+    ingestion_warnings: list[IngestionWarning] = Field(default_factory=list)
     ingestion_started_at: datetime | None = None
     ingestion_completed_at: datetime | None = None
 
@@ -36,6 +69,8 @@ class DocumentUploadResponse(BaseModel):
     files_queued: int = 0
     ingestion_status: str = "queued"
     message: str = "Documents accepted for processing"
+    summary: IngestionSummary = Field(default_factory=IngestionSummary)
+    file_results: list[FileIngestionResult] = Field(default_factory=list)
 
 
 class DocumentInfo(BaseModel):

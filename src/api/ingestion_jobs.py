@@ -1,30 +1,25 @@
 """Background ingestion jobs for async document processing."""
 
 import asyncio
-import io
 import uuid
-from typing import TypedDict
 
 from src.api import session as session_service
+from src.api.ingestion_contract import (
+    CODE_INGESTION_INTERNAL_ERROR,
+    FileIngestionResultData,
+    UploadFilePayload,
+    build_ingestion_message,
+    build_ingestion_warnings,
+    format_ingestion_error,
+    process_and_store_payloads,
+    summarize_file_results,
+)
 from src.api.usage import record_usage_event
 from src.core.config import settings
-from src.core.exceptions import DocumentProcessingError
 from src.core.logger import get_logger
 from src.db.connection import get_db_context
-from src.ingestion.chunkers import extract_document_header, split_documents
-from src.ingestion.loaders import load_document_from_upload
-from src.ingestion.pgvector_store import store_documents
 
 logger = get_logger(__name__)
-
-
-class UploadFilePayload(TypedDict):
-    filename: str
-    content: bytes
-    document_id: str
-    file_path: str
-    mime_type: str
-    file_size_bytes: int
 
 
 _jobs: dict[str, asyncio.Task] = {}
@@ -34,6 +29,8 @@ def schedule_ingestion_job(
     session_id: uuid.UUID,
     payloads: list[UploadFilePayload],
     *,
+    total_files: int,
+    initial_file_results: list[FileIngestionResultData] | None = None,
     enable_ocr: bool | None = None,
     extract_tables: bool | None = None,
 ) -> str:
@@ -43,6 +40,8 @@ def schedule_ingestion_job(
         _run_ingestion_job(
             session_id,
             payloads,
+            total_files=total_files,
+            initial_file_results=initial_file_results or [],
             enable_ocr=settings.enable_ocr if enable_ocr is None else enable_ocr,
             extract_tables=(
                 settings.enable_table_extraction if extract_tables is None else extract_tables
@@ -62,6 +61,8 @@ async def _run_ingestion_job(
     session_id: uuid.UUID,
     payloads: list[UploadFilePayload],
     *,
+    total_files: int,
+    initial_file_results: list[FileIngestionResultData],
     enable_ocr: bool,
     extract_tables: bool,
 ) -> None:
@@ -75,44 +76,41 @@ async def _run_ingestion_job(
                 return
             api_key_id = session.api_key_id
 
-            all_documents = []
-            for payload in payloads:
-                document_metadata = {
-                    "document_id": payload["document_id"],
-                    "original_filename": payload["filename"],
-                    "file_path": payload["file_path"],
-                    "mime_type": payload["mime_type"],
-                    "file_size_bytes": payload["file_size_bytes"],
-                }
-                docs = load_document_from_upload(
-                    io.BytesIO(payload["content"]),
-                    payload["filename"],
-                    enable_ocr=enable_ocr,
-                    extract_tables=extract_tables,
-                    document_metadata=document_metadata,
-                )
-                all_documents.extend(docs)
+            result = await process_and_store_payloads(
+                db=db,
+                session_id=session_id,
+                payloads=payloads,
+                total_files=total_files,
+                enable_ocr=enable_ocr,
+                extract_tables=extract_tables,
+                logger=logger,
+                initial_file_results=initial_file_results,
+            )
+            await session_service.set_ingestion_status(
+                db,
+                session_id,
+                result.ingestion_status,
+                error=(
+                    format_ingestion_error(result.error_code, result.message)
+                    if result.ingestion_status == "failed"
+                    else None
+                ),
+                summary=result.summary,  # type: ignore
+                warnings=result.warnings,  # type: ignore
+                file_results=result.file_results,  # type: ignore
+                error_code=result.error_code,
+            )
 
-            if not all_documents:
-                raise DocumentProcessingError("No content extracted from uploaded files")
-
-            header_chunk = extract_document_header(all_documents)
-            chunks = split_documents(all_documents)
-            if header_chunk:
-                chunks.insert(0, header_chunk)
-
-            stored_count = await store_documents(db, session_id, chunks)
-            await session_service.set_ingestion_status(db, session_id, "ready")
-
-            if api_key_id:
+            if api_key_id and result.ingestion_status in {"ready", "ready_with_warnings"}:
                 await record_usage_event(
                     db,
                     api_key_id,
                     "upload",
                     session_id=session_id,
                     metadata={
-                        "files": len(payloads),
-                        "chunks": stored_count,
+                        "files": result.summary["total_files"],
+                        "documents": result.document_processed,
+                        "chunks": result.chunks_created,
                         "ocr_enabled": enable_ocr,
                         "table_extraction_enabled": extract_tables,
                     },
@@ -121,11 +119,27 @@ async def _run_ingestion_job(
             logger.info(
                 "ingestion_job_completed",
                 session_id=str(session_id),
-                files=len(payloads),
-                chunks=stored_count,
+                files=result.summary["total_files"],
+                chunks=result.chunks_created,
+                ingestion_status=result.ingestion_status,
             )
 
     except Exception as exc:
         logger.error("ingestion_job_failed", session_id=str(session_id), error=str(exc))
         async with get_db_context() as db:
-            await session_service.set_ingestion_status(db, session_id, "failed", error=str(exc))
+            summary = summarize_file_results(
+                total_files=total_files,
+                file_results=initial_file_results,
+            )
+            warnings = build_ingestion_warnings(initial_file_results)
+            message = build_ingestion_message("failed", CODE_INGESTION_INTERNAL_ERROR)
+            await session_service.set_ingestion_status(
+                db,
+                session_id,
+                "failed",
+                error=format_ingestion_error(CODE_INGESTION_INTERNAL_ERROR, message),
+                summary=summary, # type: ignore
+                warnings=warnings, # type: ignore
+                file_results=initial_file_results, # type: ignore
+                error_code=CODE_INGESTION_INTERNAL_ERROR,
+            )

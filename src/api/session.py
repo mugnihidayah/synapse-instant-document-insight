@@ -10,6 +10,15 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.api.ingestion_contract import (
+    FileIngestionResultData,
+    IngestionSummaryData,
+    IngestionWarningData,
+    empty_ingestion_summary,
+    normalize_file_results,
+    normalize_ingestion_summary,
+    normalize_ingestion_warnings,
+)
 from src.db.models import Session
 
 
@@ -74,6 +83,10 @@ async def set_ingestion_status(
     status: str,
     *,
     error: str | None = None,
+    summary: IngestionSummaryData | None = None,
+    warnings: list[IngestionWarningData] | None = None,
+    file_results: list[FileIngestionResultData] | None = None,
+    error_code: str | None = None,
 ) -> Session | None:
     """Update ingestion status and timestamps for a session."""
     session = await get_session(db, session_id)
@@ -84,13 +97,51 @@ async def set_ingestion_status(
     session.ingestion_status = status
     session.ingestion_error = error
 
+    metadata = dict(session.metadata_ or {})
+    if summary is not None:
+        metadata["ingestion_summary"] = normalize_ingestion_summary(summary)
+    if warnings is not None:
+        metadata["ingestion_warnings"] = normalize_ingestion_warnings(warnings)
+    if file_results is not None:
+        metadata["ingestion_file_results"] = normalize_file_results(file_results)
+    if error_code is not None or status in {"ready", "ready_with_warnings", "queued", "processing"}:
+        metadata["ingestion_error_code"] = error_code
+    session.metadata_ = metadata
+
     if status == "processing":
         session.ingestion_started_at = now
         session.ingestion_completed_at = None
-    elif status in {"ready", "failed"}:
+    elif status in {"ready", "ready_with_warnings", "failed"}:
         if session.ingestion_started_at is None:
             session.ingestion_started_at = now
         session.ingestion_completed_at = now
 
     await db.flush()
     return session
+
+
+def get_ingestion_summary(session: Session) -> IngestionSummaryData:
+    """Get normalized ingestion summary from session metadata."""
+    metadata = session.metadata_ or {}
+    return (
+        normalize_ingestion_summary(metadata.get("ingestion_summary")) or empty_ingestion_summary()
+    )
+
+
+def get_ingestion_warnings(session: Session) -> list[IngestionWarningData]:
+    """Get normalized ingestion warnings from session metadata."""
+    metadata = session.metadata_ or {}
+    return normalize_ingestion_warnings(metadata.get("ingestion_warnings"))
+
+
+def get_ingestion_file_results(session: Session) -> list[FileIngestionResultData]:
+    """Get normalized per-file ingestion outcomes from session metadata."""
+    metadata = session.metadata_ or {}
+    return normalize_file_results(metadata.get("ingestion_file_results"))
+
+
+def get_ingestion_error_code(session: Session) -> str | None:
+    """Get session-level ingestion error code from session metadata."""
+    metadata = session.metadata_ or {}
+    value = metadata.get("ingestion_error_code")
+    return str(value) if value else None
