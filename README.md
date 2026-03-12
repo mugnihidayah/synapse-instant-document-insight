@@ -17,6 +17,7 @@
 [Features](#features) • [Quick Start](#quick-start) • [API](#api-documentation) • [Eval](#evaluation) • [Tech Stack](#tech-stack)
 
 API Docs: [mugnihidayah-synapse-rag-api.hf.space/docs](https://mugnihidayah-synapse-rag-api.hf.space/docs)
+Frontend Service: [synapse-frontend](https://github.com/mugnihidayah/synapse-frontend).
 
 </div>
 
