@@ -148,6 +148,8 @@ When you have enough information, respond with:
 - Use summarize_context when context is too long to process
 - Maximum {max_iterations} tool calls allowed
 - Base your answer ONLY on retrieved document content
+- CRITICAL: DO NOT use any tools that are not in the list above (e.g., no code execution, no repo browsers).
+- CRITICAL: DO NOT use native tool calling syntax. You MUST respond with the raw JSON format specified above.
 - Respond in English
 """
 
@@ -188,6 +190,8 @@ Ketika informasi sudah cukup, respons dengan:
 - Gunakan summarize_context saat konteks terlalu panjang
 - Maksimal {max_iterations} tool calls
 - Dasarkan jawaban HANYA pada konten dokumen yang ditemukan
+- KRITIS: JANGAN gunakan tools apa pun yang tidak ada di daftar atas (misal: dilarang mengeksekusi kode atau repo browser).
+- KRITIS: JANGAN gunakan sintaks tool calling bawaan. Kamu WAJIB merespons dengan format JSON mentah seperti yang dicontohkan di atas.
 - Jawab dalam Bahasa Indonesia
 """
 
