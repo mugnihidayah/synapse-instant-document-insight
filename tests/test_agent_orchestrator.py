@@ -2,10 +2,6 @@
 Tests for agent orchestrator logic.
 """
 
-import json
-
-import pytest
-
 from src.agent.orchestrator import _build_tool_descriptions_text, _parse_agent_response
 from src.agent.state import AgentStep
 
