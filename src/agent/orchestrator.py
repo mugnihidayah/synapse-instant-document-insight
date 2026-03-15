@@ -11,6 +11,7 @@ import re
 import uuid
 
 from langchain_core.documents import Document as LangchainDocument
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_groq import ChatGroq
 from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -48,6 +49,61 @@ def _build_tool_descriptions_text() -> str:
             param_text = "\nParameters:\n" + "\n".join(param_items)
         parts.append(f"**{tool['name']}**: {tool['description']}{param_text}")
     return "\n\n".join(parts)
+
+
+AGENT_TOOLS_SCHEMA = [
+    {
+        "type": "function",
+        "function": {
+            "name": "retrieve",
+            "description": "Search the uploaded documents with a query.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Search query"},
+                    "top_k": {"type": "integer"},
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "analyze_sources",
+            "description": "Evaluate if retrieved sources are sufficient.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "summarize_context",
+            "description": "Summarize the retrieved context.",
+            "parameters": {"type": "object", "properties": {"focus": {"type": "string"}}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "refine_query",
+            "description": "Generate a better search query.",
+            "parameters": {
+                "type": "object",
+                "properties": {"reason": {"type": "string"}},
+                "required": ["reason"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "compare_sources",
+            "description": "Cross-reference information across retrieved sources.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+]
 
 
 def _parse_agent_response(text: str) -> dict | None:
@@ -135,6 +191,13 @@ async def run_agent(
         temperature=agent_temp,
     )
 
+    # Bind native tools to prevent API crashes on aggressive models
+    try:
+        llm_with_tools = llm.bind_tools(AGENT_TOOLS_SCHEMA)  # type: ignore[attr-defined]
+    except Exception as e:
+        logger.warning("failed_to_bind_tools", error=str(e))
+        llm_with_tools = llm
+
     # Build system prompt with tool descriptions
     tool_desc_text = _build_tool_descriptions_text()
     system_prompt = get_agent_prompt(language).format(
@@ -143,15 +206,15 @@ async def run_agent(
     )
 
     # Conversation messages for the agent
-    messages = [
-        ("system", system_prompt),
+    messages: list[BaseMessage] = [
+        SystemMessage(content=system_prompt),
     ]
 
     # Add chat history context if available
     if chat_history_str:
-        messages.append(("system", f"Previous conversation:\n{chat_history_str}"))
+        messages.append(SystemMessage(content=f"Previous conversation:\n{chat_history_str}"))
 
-    messages.append(("human", question))
+    messages.append(HumanMessage(content=question))
 
     # Agent state
     steps: list[AgentStep] = []
@@ -168,7 +231,7 @@ async def run_agent(
 
         # Get agent response
         try:
-            response = await llm.ainvoke(messages)
+            response = await llm_with_tools.ainvoke(messages)
             content = response.content
             agent_text = content.strip() if isinstance(content, str) else str(content)
         except Exception as e:
@@ -179,10 +242,23 @@ async def run_agent(
                     content=f"Error calling LLM: {e}. Falling back to direct answer.",
                 )
             )
+            response = AIMessage(content="")  # Fallback to avoid unbounded variable
+            agent_text = ""
             break
 
-        # Parse the response
-        parsed = _parse_agent_response(agent_text)
+        parsed = None
+        tool_call_id = None
+
+        # Determine if model used native tool calling or text JSON
+        tool_calls = getattr(response, "tool_calls", None)
+        if tool_calls:
+            tool_call = tool_calls[0]
+            parsed = {"tool": tool_call["name"], "arguments": tool_call["args"]}
+            tool_call_id = tool_call.get("id")
+            messages.append(response)  # Append AIMessage with tool_calls
+        else:
+            parsed = _parse_agent_response(agent_text)
+            messages.append(AIMessage(content=agent_text))
 
         if parsed is None:
             # Agent responded with plain text — treat as thought + final answer
@@ -199,11 +275,9 @@ async def run_agent(
                 break
             else:
                 # Ask agent to format properly
-                messages.append(("assistant", agent_text))
                 messages.append(
-                    (
-                        "human",
-                        "Please respond with a JSON tool call or a final_answer JSON.",
+                    HumanMessage(
+                        content="Please respond with a JSON tool call or a final_answer JSON."
                     )
                 )
                 continue
@@ -263,8 +337,14 @@ async def run_agent(
         )
 
         # Add to conversation for next iteration
-        messages.append(("assistant", agent_text))
-        messages.append(("human", f"Tool result:\n{display_result[:2000]}"))
+        if tool_call_id:
+            messages.append(
+                ToolMessage(
+                    content=f"Tool result:\n{display_result[:2000]}", tool_call_id=tool_call_id
+                )
+            )
+        else:
+            messages.append(HumanMessage(content=f"Tool result:\n{display_result[:2000]}"))
 
     # Build final result
     final_answer = ""
