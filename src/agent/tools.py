@@ -42,7 +42,9 @@ async def tool_retrieve(
 
     if settings.use_hybrid_search:
         docs = await hybrid_search(
-            db, session_id, query,
+            db,
+            session_id,
+            query,
             k=fetch_k,
             vector_weight=settings.hybrid_vector_weight,
             keyword_weight=settings.hybrid_keyword_weight,
@@ -50,7 +52,9 @@ async def tool_retrieve(
         )
     else:
         docs = await similarity_search(
-            db, session_id, query,
+            db,
+            session_id,
+            query,
             k=fetch_k,
             filters=filters,
         )
@@ -60,7 +64,8 @@ async def tool_retrieve(
 
     if settings.use_mmr:
         docs = apply_mmr_diversification(
-            docs, query,
+            docs,
+            query,
             top_k=top_k,
             lambda_mult=settings.mmr_lambda,
         )

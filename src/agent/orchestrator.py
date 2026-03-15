@@ -60,7 +60,7 @@ def _parse_agent_response(text: str) -> dict | None:
     code_block_match = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", text, re.DOTALL)
     if code_block_match:
         try:
-            return json.loads(code_block_match.group(1).strip()) # type: ignore[no-any-return]
+            return json.loads(code_block_match.group(1).strip())  # type: ignore[no-any-return]
         except json.JSONDecodeError:
             pass
 
@@ -68,7 +68,7 @@ def _parse_agent_response(text: str) -> dict | None:
     json_match = re.search(r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}", text, re.DOTALL)
     if json_match:
         try:
-            return json.loads(json_match.group(0)) # type: ignore[no-any-return]
+            return json.loads(json_match.group(0))  # type: ignore[no-any-return]
         except json.JSONDecodeError:
             pass
 

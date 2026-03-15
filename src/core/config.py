@@ -259,7 +259,6 @@ class Settings(BaseSettings):
         description="LLM temperature for agent reasoning (lower = more focused)",
     )
 
-
     @field_validator("groq_api_key", "huggingface_token")
     @classmethod
     def check_not_placeholder(cls, v: str, info) -> str:

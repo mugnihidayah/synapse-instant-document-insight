@@ -110,7 +110,6 @@ def get_prompt(language: str = "id") -> str:
     return PROMPT_ID
 
 
-
 # AGENTIC RAG PROMPTS
 AGENT_SYSTEM_PROMPT_EN: str = """
 You are "Synapse Agent", an intelligent document analysis agent.

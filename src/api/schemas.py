@@ -187,7 +187,6 @@ class QueryRequest(BaseModel):
     )
 
 
-
 class SourceItem(BaseModel):
     """Individual source/citation item"""
 
@@ -232,7 +231,6 @@ class QueryResponse(BaseModel):
     debug: QueryDebug | None = None
     agent_steps: list[AgentStepResponse] | None = None
     agent_iterations: int | None = None
-
 
 
 class FeedbackRequest(BaseModel):
