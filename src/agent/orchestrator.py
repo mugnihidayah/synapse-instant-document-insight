@@ -119,7 +119,7 @@ async def run_agent(
     4. System executes tool, returns result (Observation)
     5. Repeat until agent produces Final Answer or hits max iterations
     """
-    max_iter: int = int(max_iterations or getattr(settings, "agent_max_iterations", 5))
+    max_iter: int = int(max_iterations) if max_iterations is not None else int(getattr(settings, "agent_max_iterations", 5))
     agent_temp = (
         temperature if temperature is not None else getattr(settings, "agent_temperature", 0.1)
     )

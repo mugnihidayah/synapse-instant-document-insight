@@ -20,7 +20,7 @@ def create_app() -> Any:
 try:
     from src.api.main import app
 except ModuleNotFoundError:  # pragma: no cover - optional API dependency for core tests
-    app = None
+    app = None  # type: ignore[assignment]
 
 __all__ = [
     "app",
