@@ -27,7 +27,6 @@ from src.agent.tools import (
 )
 from src.core.config import settings
 from src.core.logger import get_logger
-from src.rag.chat_history import format_chat_history, get_chat_history
 from src.rag.grounding import is_grounded
 from src.rag.prompts import get_agent_prompt
 from src.rag.retrieval_utils import build_snippet

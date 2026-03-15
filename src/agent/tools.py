@@ -5,7 +5,6 @@ Each tool wraps existing infrastructure and returns structured results
 that the agent orchestrator can use in its reasoning loop.
 """
 
-import asyncio
 import uuid
 
 from langchain_core.documents import Document as LangchainDocument
