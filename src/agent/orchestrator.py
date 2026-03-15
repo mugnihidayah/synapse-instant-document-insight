@@ -60,7 +60,7 @@ def _parse_agent_response(text: str) -> dict | None:
     code_block_match = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", text, re.DOTALL)
     if code_block_match:
         try:
-            return json.loads(code_block_match.group(1).strip())
+            return json.loads(code_block_match.group(1).strip()) # type: ignore[no-any-return]
         except json.JSONDecodeError:
             pass
 
@@ -68,16 +68,14 @@ def _parse_agent_response(text: str) -> dict | None:
     json_match = re.search(r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}", text, re.DOTALL)
     if json_match:
         try:
-            return json.loads(json_match.group(0))
+            return json.loads(json_match.group(0)) # type: ignore[no-any-return]
         except json.JSONDecodeError:
             pass
 
     return None
 
 
-def _build_sources_from_docs(
-    docs: list[LangchainDocument], query: str
-) -> list[dict]:
+def _build_sources_from_docs(docs: list[LangchainDocument], query: str) -> list[dict]:
     """Convert retrieved LangchainDocuments to SourceItem list."""
     sources = []
     for doc in docs:
@@ -121,9 +119,9 @@ async def run_agent(
     4. System executes tool, returns result (Observation)
     5. Repeat until agent produces Final Answer or hits max iterations
     """
-    max_iter = max_iterations or getattr(settings, "agent_max_iterations", 5)
-    agent_temp = temperature if temperature is not None else getattr(
-        settings, "agent_temperature", 0.1
+    max_iter: int = int(max_iterations or getattr(settings, "agent_max_iterations", 5))
+    agent_temp = (
+        temperature if temperature is not None else getattr(settings, "agent_temperature", 0.1)
     )
     model = model_name or settings.llm_model
 
@@ -171,10 +169,12 @@ async def run_agent(
             agent_text = content.strip() if isinstance(content, str) else str(content)
         except Exception as e:
             logger.error("agent_llm_failed", error=str(e), iteration=iteration)
-            steps.append(AgentStep(
-                step_type="thought",
-                content=f"Error calling LLM: {e}. Falling back to direct answer.",
-            ))
+            steps.append(
+                AgentStep(
+                    step_type="thought",
+                    content=f"Error calling LLM: {e}. Falling back to direct answer.",
+                )
+            )
             break
 
         # Parse the response
@@ -186,39 +186,47 @@ async def run_agent(
 
             # If it looks like a final answer (long enough, no tool keywords)
             if len(agent_text) > 100:
-                steps.append(AgentStep(
-                    step_type="final_answer",
-                    content=agent_text,
-                ))
+                steps.append(
+                    AgentStep(
+                        step_type="final_answer",
+                        content=agent_text,
+                    )
+                )
                 break
             else:
                 # Ask agent to format properly
                 messages.append(("assistant", agent_text))
-                messages.append((
-                    "human",
-                    "Please respond with a JSON tool call or a final_answer JSON.",
-                ))
+                messages.append(
+                    (
+                        "human",
+                        "Please respond with a JSON tool call or a final_answer JSON.",
+                    )
+                )
                 continue
 
         # Check if it's a final answer
         if "final_answer" in parsed:
             answer = parsed["final_answer"]
-            steps.append(AgentStep(
-                step_type="final_answer",
-                content=answer,
-            ))
+            steps.append(
+                AgentStep(
+                    step_type="final_answer",
+                    content=answer,
+                )
+            )
             break
 
         # It's a tool call
         tool_name = parsed.get("tool", "")
         tool_args = parsed.get("arguments", {})
 
-        steps.append(AgentStep(
-            step_type="action",
-            content=f"Using tool: {tool_name}",
-            tool_name=tool_name,
-            tool_input=tool_args,
-        ))
+        steps.append(
+            AgentStep(
+                step_type="action",
+                content=f"Using tool: {tool_name}",
+                tool_name=tool_name,
+                tool_input=tool_args,
+            )
+        )
 
         # Execute the tool
         tool_result = await _execute_tool(
@@ -241,12 +249,14 @@ async def run_agent(
         else:
             display_result = str(tool_result)
 
-        steps.append(AgentStep(
-            step_type="observation",
-            content=display_result[:2000],  # Truncate long observations
-            tool_name=tool_name,
-            tool_output=display_result[:2000],
-        ))
+        steps.append(
+            AgentStep(
+                step_type="observation",
+                content=display_result[:2000],  # Truncate long observations
+                tool_name=tool_name,
+                tool_output=display_result[:2000],
+            )
+        )
 
         # Add to conversation for next iteration
         messages.append(("assistant", agent_text))
@@ -264,10 +274,12 @@ async def run_agent(
         final_answer = await _fallback_generate(
             llm, question, current_context, language, chat_history_str
         )
-        steps.append(AgentStep(
-            step_type="final_answer",
-            content=final_answer,
-        ))
+        steps.append(
+            AgentStep(
+                step_type="final_answer",
+                content=final_answer,
+            )
+        )
 
     if not final_answer:
         final_answer = (
@@ -275,10 +287,12 @@ async def run_agent(
             if language == "en"
             else "Saya tidak menemukan informasi yang cukup dalam dokumen untuk menjawab pertanyaan ini."
         )
-        steps.append(AgentStep(
-            step_type="final_answer",
-            content=final_answer,
-        ))
+        steps.append(
+            AgentStep(
+                step_type="final_answer",
+                content=final_answer,
+            )
+        )
 
     # Grounding check
     source_texts = [doc.page_content for doc in all_retrieved_docs]
@@ -323,29 +337,27 @@ async def _execute_tool(
         if tool_name == "retrieve":
             query = tool_args.get("query", question)
             top_k = int(tool_args.get("top_k", 5))
-            docs = await tool_retrieve(
-                db, session_id, query, top_k=top_k, filters=filters
-            )
+            docs = await tool_retrieve(db, session_id, query, top_k=top_k, filters=filters)
             display = format_retrieved_docs(docs)
             return {"display": display, "_docs": docs}
 
         elif tool_name == "analyze_sources":
-            result = await tool_analyze_sources(question, retrieved_docs)
-            return json.dumps(result, ensure_ascii=False)
+            analyze_result = await tool_analyze_sources(question, retrieved_docs)
+            return json.dumps(analyze_result, ensure_ascii=False)
 
         elif tool_name == "summarize_context":
             focus = tool_args.get("focus", "")
-            result = await tool_summarize_context(current_context, focus=focus)
-            return result
+            summary_result = await tool_summarize_context(current_context, focus=focus)
+            return summary_result
 
         elif tool_name == "refine_query":
             reason = tool_args.get("reason", "")
-            result = await tool_refine_query(question, current_context, reason=reason)
-            return f"Refined query: {result}"
+            refined_result = await tool_refine_query(question, current_context, reason=reason)
+            return f"Refined query: {refined_result}"
 
         elif tool_name == "compare_sources":
-            result = await tool_compare_sources(question, retrieved_docs)
-            return result
+            compare_result = await tool_compare_sources(question, retrieved_docs)
+            return compare_result
 
         else:
             return f"Unknown tool: {tool_name}"
@@ -363,7 +375,9 @@ async def _fallback_generate(
     chat_history: str = "",
 ) -> str:
     """Fallback: generate answer directly from context when agent loop ends without final answer."""
-    lang_instruction = "Respond in English." if language == "en" else "Jawab dalam Bahasa Indonesia."
+    lang_instruction = (
+        "Respond in English." if language == "en" else "Jawab dalam Bahasa Indonesia."
+    )
 
     prompt = (
         f"Based on the following document context, answer the question.\n"

@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
 
 from src.agent.orchestrator import run_agent
+from src.agent.state import AgentResult
 from src.api import session as session_service
 from src.api.dependencies import get_api_key
 from src.api.rate_limiter import RATE_LIMIT_QUERY, limiter
@@ -279,7 +280,7 @@ async def _retrieve_docs(
     )
 
 
-def _agent_to_response(result, query_request):
+def _agent_to_response(result: AgentResult, query_request: QueryRequest) -> QueryResponse:
     """Convert AgentResult to QueryResponse."""
     agent_steps = [
         AgentStepResponse(
@@ -342,6 +343,7 @@ async def query_stream(
     chat_history_str = format_chat_history(chat_messages)
 
     if query_request.agent_mode:
+
         async def generate_agent() -> AsyncGenerator[str, None]:
             try:
                 result = await run_agent(
@@ -399,7 +401,7 @@ async def query_stream(
                 ]
 
                 payload = {
-                    "sources": [s.model_dump() for s in result.sources],
+                    "sources": result.sources,
                     "grounded": result.grounded,
                     "grounding_score": result.grounding_score,
                     "agent_steps": agent_steps_data,
