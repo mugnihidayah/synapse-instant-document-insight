@@ -18,15 +18,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
+# Install uv for fast dependency resolution
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 # Copy dependency files
-COPY pyproject.toml README.md ./
+COPY pyproject.toml uv.lock README.md ./
 COPY src/ src/
 # Install CPU-only PyTorch first (MUCH smaller than full torch)
-RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+RUN uv pip install --system --no-cache torch --index-url https://download.pytorch.org/whl/cpu
 # Install remaining dependencies
-RUN pip install --no-cache-dir -e ".[api]"
-# Clean up
-RUN rm -rf /root/.cache/pip
+RUN uv pip install --system --no-cache -e ".[api]"
 # Verify
 RUN python -c "import uvicorn; print('uvicorn OK')"
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \

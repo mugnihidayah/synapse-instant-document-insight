@@ -239,6 +239,27 @@ class Settings(BaseSettings):
         description="Maximum number of chat messages included in exports.",
     )
 
+    # Agent settings
+    agent_enabled: bool = Field(
+        default=True,
+        description="Enable agentic RAG mode",
+    )
+
+    agent_max_iterations: int = Field(
+        default=5,
+        ge=1,
+        le=10,
+        description="Maximum reasoning steps for agentic RAG",
+    )
+
+    agent_temperature: float = Field(
+        default=0.1,
+        ge=0,
+        le=1,
+        description="LLM temperature for agent reasoning (lower = more focused)",
+    )
+
+
     @field_validator("groq_api_key", "huggingface_token")
     @classmethod
     def check_not_placeholder(cls, v: str, info) -> str:

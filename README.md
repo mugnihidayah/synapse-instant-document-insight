@@ -1,4 +1,4 @@
-﻿<div align="center">
+<div align="center">
 
 # Synapse
 
@@ -18,7 +18,7 @@
 
 API Docs: [mugnihidayah-synapse-rag-api.hf.space/docs](https://mugnihidayah-synapse-rag-api.hf.space/docs)
 
-Frontend Service: [synapse-frontend](https://github.com/mugnihidayah/synapse-frontend).
+Frontend Client: [mugnihidayah/synapse-frontend](https://github.com/mugnihidayah/synapse-frontend)
 
 </div>
 
@@ -30,6 +30,7 @@ Frontend Service: [synapse-frontend](https://github.com/mugnihidayah/synapse-fro
 - Async ingestion pipeline: upload queue with status (`queued`, `processing`, `ready`, `ready_with_warnings`, `failed`).
 - Retrieval upgrades: hybrid search (vector + keyword), reranking, dynamic `top_k`, MMR diversification.
 - Query quality: contextualization, query rewrite, strict grounding guardrail, richer citations.
+- Agentic RAG: ReAct-style agent with multi-step reasoning and dynamic tool use (retrieve, compare, summarize, refine).
 - Metadata filters at query time: by source, page range, chunk type, content origin.
 - Session tools: session status, paginated chunk listing, session export (`markdown`/`json`).
 - Product signals: feedback endpoint and usage analytics with daily query quota.
@@ -54,17 +55,20 @@ docker compose up -d
 
 ### Local Development
 
+We use [`uv`](https://github.com/astral-sh/uv) for lightning-fast Python dependency management.
+
 ```bash
 git clone https://github.com/mugnihidayah/synapse-instant-document-insight.git
 cd synapse-instant-document-insight
 
-python -m venv .venv
+# Install dependencies and create venv automatically
+uv sync --all-extras
+
 # Linux/macOS:
 source .venv/bin/activate
 # Windows PowerShell:
 # .venv\Scripts\Activate.ps1
 
-pip install -e ".[dev,api]"
 docker compose up db -d
 
 # initialize/update schema (run this on your DB, including Neon)
@@ -146,8 +150,10 @@ Example payload with filters/debug:
 
 ```json
 {
-  "question": "Summarize key risks",
+  "question": "Summarize key risks and compare with Q1",
   "language": "en",
+  "agent_mode": true,
+  "max_agent_steps": 5,
   "top_k": 8,
   "rerank_top_k": 3,
   "include_debug": true,
@@ -308,6 +314,11 @@ MAX_UPLOAD_FILE_SIZE_MB=50
 # Analytics / export
 USAGE_DAILY_QUERY_QUOTA=1000
 EXPORT_MAX_MESSAGES=200
+
+# Agent settings
+AGENT_ENABLED=true
+AGENT_MAX_ITERATIONS=5
+AGENT_TEMPERATURE=0.1
 ```
 
 ---

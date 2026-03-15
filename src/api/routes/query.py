@@ -11,10 +11,11 @@ from langchain_core.documents import Document as LangchainDocument
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
 
+from src.agent.orchestrator import run_agent
 from src.api import session as session_service
 from src.api.dependencies import get_api_key
 from src.api.rate_limiter import RATE_LIMIT_QUERY, limiter
-from src.api.schemas import QueryDebug, QueryRequest, QueryResponse, SourceItem
+from src.api.schemas import AgentStepResponse, QueryDebug, QueryRequest, QueryResponse, SourceItem
 from src.api.usage import has_remaining_query_quota, record_usage_event
 from src.core.config import settings
 from src.core.logger import get_logger
@@ -278,6 +279,30 @@ async def _retrieve_docs(
     )
 
 
+def _agent_to_response(result, query_request):
+    """Convert AgentResult to QueryResponse."""
+    agent_steps = [
+        AgentStepResponse(
+            step_type=step.step_type,
+            content=step.content,
+            tool_name=step.tool_name,
+        )
+        for step in result.steps
+    ]
+
+    return QueryResponse(
+        answer=result.answer,
+        sources=[SourceItem(**s) for s in result.sources],
+        model_used=result.model_used,
+        rewritten_query=result.rewritten_query,
+        grounded=result.grounded,
+        grounding_score=result.grounding_score,
+        debug=None,
+        agent_steps=agent_steps,
+        agent_iterations=result.iterations,
+    )
+
+
 @router.post("/stream/{session_id}")
 @limiter.limit(RATE_LIMIT_QUERY)
 async def query_stream(
@@ -315,6 +340,78 @@ async def query_stream(
 
     chat_messages = await get_chat_history(db, session.id, limit=5)
     chat_history_str = format_chat_history(chat_messages)
+
+    if query_request.agent_mode:
+        async def generate_agent() -> AsyncGenerator[str, None]:
+            try:
+                result = await run_agent(
+                    question=query_request.question,
+                    session_id=session.id,
+                    db=db,
+                    language=query_request.language,
+                    model_name=query_request.model or settings.llm_model,
+                    max_iterations=query_request.max_agent_steps,
+                    temperature=query_request.temperature,
+                    filters=extract_filter_payload(query_request.filters),
+                    chat_history_str=chat_history_str,
+                )
+
+                # Stream agent steps
+                for step in result.steps:
+                    step_data = {
+                        "step": {
+                            "step_type": step.step_type,
+                            "content": step.content,
+                            "tool_name": step.tool_name,
+                        }
+                    }
+                    yield f"data: {json.dumps(step_data)}\n\n"
+
+                # Stream final answer as chunks
+                yield f"data: {json.dumps({'chunk': result.answer})}\n\n"
+
+                await save_chat_message(db, session.id, "user", query_request.question)
+                await save_chat_message(db, session.id, "assistant", result.answer)
+
+                await record_usage_event(
+                    db,
+                    api_key.id,
+                    "query",
+                    session_id=session.id,
+                    metadata={
+                        "model": result.model_used,
+                        "agent_mode": True,
+                        "agent_iterations": result.iterations,
+                        "grounded": result.grounded,
+                        "grounding_score": result.grounding_score,
+                        "source_count": len(result.sources),
+                    },
+                )
+
+                # Send sources + agent metadata
+                agent_steps_data = [
+                    {
+                        "step_type": s.step_type,
+                        "content": s.content,
+                        "tool_name": s.tool_name,
+                    }
+                    for s in result.steps
+                ]
+
+                payload = {
+                    "sources": [s.model_dump() for s in result.sources],
+                    "grounded": result.grounded,
+                    "grounding_score": result.grounding_score,
+                    "agent_steps": agent_steps_data,
+                    "agent_iterations": result.iterations,
+                }
+                yield f"data: {json.dumps(payload)}\n\n"
+                yield "data: [DONE]\n\n"
+
+            except Exception as exc:
+                yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+
+        return StreamingResponse(generate_agent(), media_type="text/event-stream")
 
     try:
         docs, debug_payload, rewritten_query = await _retrieve_docs(
@@ -451,6 +548,48 @@ async def query(
 
     chat_messages = await get_chat_history(db, session.id, limit=5)
     chat_history_str = format_chat_history(chat_messages)
+
+    if query_request.agent_mode:
+        try:
+            filters = extract_filter_payload(query_request.filters)
+            result = await run_agent(
+                question=query_request.question,
+                session_id=session.id,
+                db=db,
+                language=query_request.language,
+                model_name=query_request.model or settings.llm_model,
+                max_iterations=query_request.max_agent_steps,
+                temperature=query_request.temperature,
+                filters=filters,
+                chat_history_str=chat_history_str,
+            )
+
+            await save_chat_message(db, session.id, "user", query_request.question)
+            await save_chat_message(db, session.id, "assistant", result.answer)
+
+            await record_usage_event(
+                db,
+                api_key.id,
+                "query",
+                session_id=session.id,
+                metadata={
+                    "model": result.model_used,
+                    "agent_mode": True,
+                    "agent_iterations": result.iterations,
+                    "grounded": result.grounded,
+                    "grounding_score": result.grounding_score,
+                    "source_count": len(result.sources),
+                },
+            )
+
+            return _agent_to_response(result, query_request)
+
+        except Exception as exc:
+            logger.error("agent_query_failed", error=str(exc))
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=str(exc),
+            ) from exc
 
     try:
         docs, debug_payload, rewritten_query = await _retrieve_docs(

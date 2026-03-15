@@ -174,6 +174,19 @@ class QueryRequest(BaseModel):
         description="Enable query rewrite before retrieval",
     )
 
+    agent_mode: bool = Field(
+        default=False,
+        description="Enable agentic RAG mode with multi-step reasoning",
+    )
+
+    max_agent_steps: int = Field(
+        default=5,
+        ge=1,
+        le=10,
+        description="Maximum agent reasoning steps",
+    )
+
+
 
 class SourceItem(BaseModel):
     """Individual source/citation item"""
@@ -199,6 +212,14 @@ class QueryDebug(BaseModel):
     filters_applied: dict | None = None
 
 
+class AgentStepResponse(BaseModel):
+    """A single step in the agent's reasoning process."""
+
+    step_type: Literal["thought", "action", "observation", "final_answer"]
+    content: str
+    tool_name: str | None = None
+
+
 class QueryResponse(BaseModel):
     """Response from RAG query"""
 
@@ -209,6 +230,9 @@ class QueryResponse(BaseModel):
     grounded: bool = True
     grounding_score: float = Field(default=1.0, ge=0, le=1)
     debug: QueryDebug | None = None
+    agent_steps: list[AgentStepResponse] | None = None
+    agent_iterations: int | None = None
+
 
 
 class FeedbackRequest(BaseModel):

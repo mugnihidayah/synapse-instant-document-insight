@@ -1,7 +1,7 @@
 """
 FastAPI application for synapse RAG
 
-This module creates nad configures the FastAPI application
+This module creates and configures the FastAPI application
 """
 
 import asyncio
@@ -15,6 +15,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from src import __version__
 from src.api.rate_limiter import limiter
 from src.api.routes import documents_router, insights_router, keys_router, query_router
 from src.api.session import cleanup_expired_sessions
@@ -35,7 +36,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
 
     # startup
-    print("starting Synapse RAG API...")
+    logger.info("app_started", version=__version__)
     settings.setup_environment()
 
     cleanup_task = asyncio.create_task(periodic_cleanup())
@@ -45,7 +46,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     cleanup_task.cancel()
 
     # shutdown
-    print("shutting down Synapse RAG API...")
+    logger.info("app_stopped")
 
 
 async def periodic_cleanup():
@@ -74,17 +75,9 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Synapse RAG API",
         description="Production-ready RAG API for document Q&A",
-        version="0.1.0",
+        version=__version__,
         lifespan=lifespan,
     )
-
-    @app.on_event("startup")
-    async def startup_event():
-        logger.info("app_started", version="0.1.0")
-
-    @app.on_event("shutdown")
-    async def shutdown_event():
-        logger.info("app_stopped")
 
     # Add rate limiting
     app.state.limiter = limiter
@@ -122,7 +115,7 @@ def health_check() -> dict:
     return {
         "status": "healthy",
         "service": "synapse-rag",
-        "version": "0.1.0",
+        "version": __version__,
     }
 
 
