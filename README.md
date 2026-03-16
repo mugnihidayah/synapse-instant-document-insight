@@ -18,7 +18,7 @@
 
 API Docs: [mugnihidayah-synapse-rag-api.hf.space/docs](https://mugnihidayah-synapse-rag-api.hf.space/docs)
 
-Frontend: [mugnihidayah/synapse-frontend](https://github.com/mugnihidayah/synapse-frontend)
+Frontend Repo: [mugnihidayah/synapse-frontend](https://github.com/mugnihidayah/synapse-frontend)
 
 </div>
 
